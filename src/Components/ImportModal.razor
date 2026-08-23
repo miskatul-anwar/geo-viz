@@ -1,0 +1,300 @@
+@using System.IO
+@inject IJSRuntime JsRuntime
+@implements IDisposable
+
+<div class="geoviz-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title-import" @onclick="CloseModal">
+    <div class="geoviz-modal-box" style="width: 600px;" @onclick:stopPropagation="true">
+        <header class="modal-header">
+            <h3 id="modal-title-import" style="font-size: 13px; font-weight: 800; display: flex; align-items: center; gap: var(--space-2);">
+                <LucideIcon Name="upload-cloud" Size="15" Color="var(--accent)" />
+                <span>Import Spatial Dataset (GeoJSON &amp; Shapefile)</span>
+            </h3>
+            <button class="btn btn-icon btn-sm btn-secondary" @onclick="CloseModal" aria-label="Close Dialog">
+                <LucideIcon Name="x" Size="12" />
+            </button>
+        </header>
+
+        <main class="modal-body">
+            <!-- Format Selector Tabs -->
+            <div style="display: flex; gap: var(--space-2); margin-bottom: var(--space-3);">
+                <button type="button" class="btn btn-sm @(ImportFormatMode == "auto" ? "btn-primary" : "btn-secondary")" @onclick='() => SetMode("auto")'>
+                    <LucideIcon Name="file-plus" Size="12" />
+                    <span>Auto-Detect (GeoJSON, Shapefile, KML/KMZ, GPX, GeoPackage)</span>
+                </button>
+                <button type="button" class="btn btn-sm @(ImportFormatMode == "text" ? "btn-primary" : "btn-secondary")" @onclick='() => SetMode("text")'>
+                    <LucideIcon Name="code" Size="12" />
+                    <span>Paste GeoJSON Text</span>
+                </button>
+            </div>
+
+            <!-- File Upload Drop Zone -->
+            @if (ImportFormatMode != "text")
+            {
+                <div class="file-upload-dropzone" style="position: relative; padding: 22px 16px;">
+                    <InputFile OnChange="HandleFileSelected" accept=".geojson,.json,.txt,.shp,.zip,.kml,.kmz,.gpx,.gpkg" id="spatial-file-input" class="hidden-file-input" />
+                    <div class="file-drop-label">
+                        <div style="margin-bottom: 6px;">
+                            <LucideIcon Name="upload" Size="28" Color="var(--accent)" />
+                        </div>
+                        @if (!string.IsNullOrEmpty(UploadedFileName))
+                        {
+                            <div style="display: flex; align-items: center; justify-content: center; gap: var(--space-2);">
+                                <span style="font-weight: 700; color: var(--color-success); font-size: 12px;">📁 @UploadedFileName (@UploadedFileSize)</span>
+                                <span class="badge" style="font-size: 10px; background-color: var(--accent-subtle); color: var(--accent); padding: 2px 6px; border-radius: 4px; font-weight: 700;">
+                                    @FormatLabel
+                                </span>
+                            </div>
+                            <span style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">File ready for import. Click to replace.</span>
+                        }
+                        else
+                        {
+                            <span style="font-weight: 700; color: var(--text-primary); font-size: 12px;">Click to Browse or Drag &amp; Drop Spatial File</span>
+                            <span style="font-size: 10.5px; color: var(--text-secondary); margin-top: 3px;">Supports <strong>.geojson</strong> <strong>.kml/.kmz</strong> <strong>.gpx</strong> <strong>.gpkg</strong> and <strong>.shp/.zip</strong> up to 100MB</span>
+                        }
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; margin-top: -6px;">
+                    <button type="button" class="btn btn-secondary btn-sm" @onclick="TriggerJsFilePicker" aria-label="Open File Dialog">
+                        <LucideIcon Name="folder" Size="11" />
+                        <span>Browse Computer...</span>
+                    </button>
+                </div>
+            }
+
+            <div class="form-group" style="margin-top: var(--space-3);">
+                <label for="dataset-name-input">Dataset / Layer Name:</label>
+                <input id="dataset-name-input" class="form-control" placeholder="e.g. Urban Cadastre, River Network" @bind="DatasetName" />
+            </div>
+
+            @if (ImportFormatMode == "text" || !string.IsNullOrEmpty(GeoJsonText))
+            {
+                <div class="form-group">
+                    <label for="geojson-payload-input">GeoJSON Content / Text:</label>
+                    <textarea id="geojson-payload-input" class="sql-editor-textarea" style="height: 130px;" 
+                              placeholder='{ "type": "FeatureCollection", "features": [ ... ] }' 
+                              @bind="GeoJsonText"
+                              aria-label="GeoJSON Payload Text"></textarea>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(ErrorMessage))
+            {
+                <div style="background-color: var(--color-danger-bg); border: 1px solid var(--color-danger); color: var(--color-danger); padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); font-size: 11px; font-family: var(--font-mono); display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-2);" role="alert">
+                    <LucideIcon Name="alert-triangle" Size="14" Color="var(--color-danger)" />
+                    <span>@ErrorMessage</span>
+                </div>
+            }
+        </main>
+
+        <footer class="modal-footer">
+            <button class="btn btn-secondary btn-sm" @onclick="CloseModal" aria-label="Cancel Import">
+                Cancel
+            </button>
+            <button class="btn btn-primary btn-sm" @onclick="ConfirmImport" disabled="@(IsProcessing || (string.IsNullOrEmpty(GeoJsonText) && string.IsNullOrEmpty(RawBase64Data)))" aria-label="Confirm Import">
+                @if (IsProcessing)
+                {
+                    <span class="geoviz-spinner" style="width: 12px; height: 12px;"></span>
+                    <span>Parsing &amp; Importing...</span>
+                }
+                else
+                {
+                    <LucideIcon Name="upload" Size="12" Color="var(--text-inverse)" />
+                    <span>Import @FormatLabel</span>
+                }
+            </button>
+        </footer>
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    [Inject] public AppState State { get; set; } = default!;
+
+    private string ImportFormatMode { get; set; } = "auto";
+    private string DatasetName { get; set; } = string.Empty;
+    private string GeoJsonText { get; set; } = string.Empty;
+    private string RawBase64Data { get; set; } = string.Empty;
+    private string SourceFormat { get; set; } = "geojson";
+    private static readonly string[] BinaryFormats = { "shapefile", "kmz", "gpkg" };
+    private bool IsBinaryFormat => BinaryFormats.Contains(SourceFormat);
+    private string FormatLabel => SourceFormat switch
+    {
+        "shapefile" => "ESRI Shapefile",
+        "kml" => "KML",
+        "kmz" => "KMZ (Zipped KML)",
+        "gpx" => "GPX Track",
+        "gpkg" => "GeoPackage",
+        _ => "GeoJSON"
+    };
+    private string? UploadedFileName { get; set; }
+    private string? UploadedFileSize { get; set; }
+    private string? ErrorMessage { get; set; }
+    private bool IsProcessing { get; set; }
+
+    private DotNetObjectReference<ImportModal>? dotNetRef;
+
+    protected override void OnInitialized()
+    {
+        dotNetRef = DotNetObjectReference.Create(this);
+    }
+
+    private void SetMode(string mode)
+    {
+        ImportFormatMode = mode;
+        ErrorMessage = null;
+    }
+
+    private async Task TriggerJsFilePicker()
+    {
+        ErrorMessage = null;
+        try
+        {
+            if (dotNetRef != null)
+            {
+                await JsRuntime.InvokeVoidAsync("geoVizMap.openFilePicker", dotNetRef);
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"File dialog error: {ex.Message}";
+        }
+    }
+
+    [JSInvokable]
+    public Task OnJsFileSelected(string fileName, long fileSize, string content, bool isBinary)
+    {
+        ErrorMessage = null;
+        UploadedFileName = fileName;
+        UploadedFileSize = fileSize > 1024 * 1024
+            ? $"{(fileSize / (1024.0 * 1024.0)):F2} MB"
+            : $"{(fileSize / 1024.0):F1} KB";
+
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        SourceFormat = DetectFormat(ext, isBinary);
+
+        if (string.IsNullOrWhiteSpace(DatasetName))
+        {
+            var cleanName = Path.GetFileNameWithoutExtension(fileName)
+                .Replace("_", " ")
+                .Replace("-", " ");
+            DatasetName = char.ToUpper(cleanName[0]) + cleanName[1..];
+        }
+
+        if (IsBinaryFormat)
+        {
+            RawBase64Data = content;
+            GeoJsonText = string.Empty;
+        }
+        else
+        {
+            GeoJsonText = content;
+            RawBase64Data = string.Empty;
+        }
+
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        ErrorMessage = null;
+        var file = e.File;
+        if (file == null) return;
+
+        try
+        {
+            UploadedFileName = file.Name;
+            UploadedFileSize = file.Size > 1024 * 1024
+                ? $"{(file.Size / (1024.0 * 1024.0)):F2} MB"
+                : $"{(file.Size / 1024.0):F1} KB";
+
+            var ext = Path.GetExtension(file.Name).ToLowerInvariant();
+            SourceFormat = DetectFormat(ext, false);
+
+            if (string.IsNullOrWhiteSpace(DatasetName))
+            {
+                var cleanName = Path.GetFileNameWithoutExtension(file.Name)
+                    .Replace("_", " ")
+                    .Replace("-", " ");
+                DatasetName = char.ToUpper(cleanName[0]) + cleanName[1..];
+            }
+
+            const long maxAllowedSize = 100 * 1024 * 1024;
+            using var stream = file.OpenReadStream(maxAllowedSize);
+
+            if (IsBinaryFormat)
+            {
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+                RawBase64Data = Convert.ToBase64String(ms.ToArray());
+                GeoJsonText = string.Empty;
+            }
+            else
+            {
+                using var reader = new StreamReader(stream);
+                GeoJsonText = await reader.ReadToEndAsync();
+                RawBase64Data = string.Empty;
+            }
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Error reading uploaded file: {ex.Message}";
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task ConfirmImport()
+    {
+        var payload = IsBinaryFormat ? RawBase64Data : GeoJsonText;
+        if (string.IsNullOrEmpty(payload))
+        {
+            ErrorMessage = "Please select a spatial dataset file to import.";
+            return;
+        }
+
+        var name = string.IsNullOrWhiteSpace(DatasetName) ? "Imported Layer" : DatasetName.Trim();
+        IsProcessing = true;
+        ErrorMessage = null;
+
+        try
+        {
+            await State.ImportAsync(name, payload, SourceFormat);
+            if (OnClose.HasDelegate)
+                await OnClose.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            IsProcessing = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private static string DetectFormat(string extension, bool isBinary) => extension switch
+    {
+        ".shp" or ".zip" => "shapefile",
+        ".kml" => "kml",
+        ".kmz" => "kmz",
+        ".gpx" => "gpx",
+        ".gpkg" => "gpkg",
+        ".geojson" or ".json" or ".txt" => "geojson",
+        _ => isBinary ? "shapefile" : "geojson"
+    };
+
+    private async Task CloseModal()
+    {
+        if (OnClose.HasDelegate)
+        {
+            await OnClose.InvokeAsync();
+        }
+    }
+
+    public void Dispose()
+    {
+        dotNetRef?.Dispose();
+    }
+}

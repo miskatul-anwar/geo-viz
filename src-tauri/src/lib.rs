@@ -1,0 +1,71 @@
+pub mod commands;
+pub mod db;
+pub mod error;
+pub mod gis;
+pub mod models;
+pub mod services;
+
+#[cfg(test)]
+#[allow(clippy::module_inception)]
+mod tests;
+
+use db::AppDb;
+use tauri::Manager;
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .setup(|app| {
+            let app_data_dir = app.path().app_data_dir().ok();
+            let db = tauri::async_runtime::block_on(async {
+                AppDb::init(app_data_dir)
+                    .await
+                    .expect("Failed to initialize SQLite database")
+            });
+            app.manage(db);
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            // Ingestion & provisioning
+            commands::import_dataset,
+            commands::add_result_layer,
+            // Datasets
+            commands::save_dataset,
+            commands::list_datasets,
+            commands::get_dataset,
+            commands::delete_dataset,
+            // Layers
+            commands::save_layer,
+            commands::list_layers,
+            commands::delete_layer,
+            // Calculation tabs
+            commands::save_calculation_tab,
+            commands::list_calculation_tabs,
+            commands::delete_calculation_tab,
+            // SQL console & stats
+            commands::execute_sql_query,
+            commands::get_database_stats,
+            // Geoprocessing tools
+            commands::run_buffer_tool,
+            commands::run_convex_hull_tool,
+            commands::run_centroid_tool,
+            commands::run_bounding_box_tool,
+            commands::run_simplify_tool,
+            commands::run_metrics_tool,
+            commands::run_spatial_query_tool,
+            commands::run_spatial_binning_tool,
+            commands::run_distance_matrix_tool,
+            commands::run_random_points_tool,
+            commands::run_overlay_tool,
+            commands::run_dissolve_tool,
+            commands::run_spatial_join_tool,
+            // Symbology
+            commands::compute_class_breaks,
+            // Bookmarks
+            commands::save_bookmark,
+            commands::list_bookmarks,
+            commands::delete_bookmark
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}

@@ -1,0 +1,22 @@
+@inherits ComponentBase
+
+<section class="map-studio-layout" aria-label="Map Studio Workspace">
+    <LayerManager OnAddLayer="() => ShowImportModal = true"
+                  OnOpenAttributeTable="@(_ => TableCollapsed = false)" />
+
+    <MapCanvas IsTableOpen="@(!TableCollapsed)"
+               OnToggleTable="() => TableCollapsed = !TableCollapsed" />
+
+    <AttributeTable IsCollapsed="@TableCollapsed"
+                    OnToggleCollapse="@(c => TableCollapsed = c)" />
+
+    @if (ShowImportModal)
+    {
+        <ImportModal OnClose="() => ShowImportModal = false" />
+    }
+</section>
+
+@code {
+    private bool ShowImportModal { get; set; }
+    private bool TableCollapsed { get; set; } = true;
+}

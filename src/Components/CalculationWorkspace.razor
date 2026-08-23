@@ -1,0 +1,437 @@
+@inject AppState State
+@inject IJSRuntime JsRuntime
+@implements IDisposable
+
+<main class="calc-workspace-container" aria-label="Spatial Calculation Workspace">
+    <header class="calc-tabs-header-bar" role="tablist" aria-label="Calculation Tabs">
+        @foreach (var tab in State.Tabs)
+        {
+            var isCurrent = State.ActiveTabId == tab.Id;
+            <div class="calc-tab-pill @(isCurrent ? "active" : "")"
+                 role="tab"
+                 aria-selected="@isCurrent"
+                 tabindex="0"
+                 @onclick="() => State.SwitchTab(tab.Id)">
+                <LucideIcon Name="zap" Size="12" Color="@(isCurrent ? "var(--accent)" : "var(--text-secondary)")" />
+                <span>@tab.Title</span>
+                @if (State.Tabs.Count > 1)
+                {
+                    <button class="tab-close-btn"
+                            @onclick="() => CloseTab(tab.Id)"
+                            @onclick:stopPropagation="true"
+                            title="Close tab @tab.Title"
+                            aria-label="Close Tab @tab.Title">
+                        <LucideIcon Name="x" Size="10" />
+                    </button>
+                }
+            </div>
+        }
+        <button class="calc-add-tab-btn" @onclick="async () => await State.CreateTabAsync()" title="Add new calculation tab" aria-label="New Calculation Tab">
+            <LucideIcon Name="plus" Size="10" />
+            <span>New Tab</span>
+        </button>
+    </header>
+
+    <section class="calc-workspace-body">
+        <!-- 1. Tool selector -->
+        <nav class="tool-selector-panel" aria-label="Spatial Geoprocessing Tools">
+            @foreach (var category in ToolCatalog.Categories)
+            {
+                <h4 class="tool-category-title">@category.Name</h4>
+                @foreach (var tool in category.Tools)
+                {
+                    var toolKey = tool.Key;
+                    var selected = State.ActiveTab?.ActiveTool == toolKey;
+                    <div class="tool-card-item @(selected ? "selected" : "")" @onclick='() => SetTool(toolKey)' role="button" tabindex="0">
+                        <span class="tool-item-icon">
+                            <LucideIcon Name="@tool.Icon" Size="14" Color="var(--accent)" />
+                        </span>
+                        <div class="tool-item-details">
+                            <h4>@tool.Name</h4>
+                            <p>@tool.Description</p>
+                        </div>
+                    </div>
+                }
+            }
+        </nav>
+
+        <!-- 2. Parameter configuration -->
+        <article class="tool-config-panel" aria-label="Tool Parameters Configuration">
+            @{
+                var currentTool = State.ActiveTab is null ? null : ToolCatalog.ById.GetValueOrDefault(State.ActiveTab.ActiveTool);
+            }
+            @if (currentTool is not null && State.ActiveTab is not null)
+            {
+                <div class="config-header">
+                    <h2>
+                        <LucideIcon Name="@currentTool.Icon" Size="18" Color="var(--accent)" />
+                        <span>@currentTool.Name</span>
+                    </h2>
+                    <p>@currentTool.LongDescription</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="primary-dataset-select">Primary Input Layer / Dataset:</label>
+                    <select id="primary-dataset-select" class="form-control" @bind="_datasetId">
+                        <option value="">-- Select Input Layer --</option>
+                        @foreach (var ds in State.Datasets)
+                        {
+                            <option value="@ds.Id">@ds.Name (@ds.FeatureCount features)</option>
+                        }
+                    </select>
+                    @if (State.Datasets.Count == 0)
+                    {
+                        <span class="form-hint">Import a dataset in Map Studio first.</span>
+                    }
+                </div>
+
+                @if (currentTool.Key == "buffer")
+                {
+                    <div class="form-group">
+                        <label for="buffer-distance-input">Buffer Distance (Meters):</label>
+                        <div class="range-with-input">
+                            <input type="range" min="100" max="500000" step="500" @bind="_bufferDistance" @bind:event="oninput" aria-label="Buffer Range" />
+                            <input id="buffer-distance-input" type="number" class="form-control" @bind="_bufferDistance" />
+                        </div>
+                        <span class="form-hint">Radius: @((_bufferDistance / 1000.0).ToString("F1")) kilometers</span>
+                    </div>
+                }
+                else if (currentTool.Key == "simplify")
+                {
+                    <div class="form-group">
+                        <label for="simplify-tolerance-input">Simplification Tolerance (Degrees):</label>
+                        <div class="range-with-input">
+                            <input type="range" min="0.001" max="1.0" step="0.005" @bind="_tolerance" @bind:event="oninput" aria-label="Simplify Tolerance Range" />
+                            <input id="simplify-tolerance-input" type="number" step="0.001" class="form-control" @bind="_tolerance" />
+                        </div>
+                    </div>
+                }
+                else if (currentTool.Key == "spatial_binning")
+                {
+                    <div class="form-group">
+                        <label for="binning-grid-type">Binning Pattern:</label>
+                        <select id="binning-grid-type" class="form-control" @bind="_gridType">
+                            <option value="hexbin">Hexagonal Grid (Hexbin)</option>
+                            <option value="square">Square Matrix Grid</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="bin-size-input">Cell Size (km):</label>
+                        <input id="bin-size-input" type="number" step="1" min="1" max="1000" class="form-control" @bind="_cellSizeKm" />
+                    </div>
+                }
+                else if (currentTool.Key == "spatial_query")
+                {
+                    <div class="form-group">
+                        <label for="polygon-mask-select">Polygon Boundary Mask Dataset (Optional):</label>
+                        <select id="polygon-mask-select" class="form-control" @bind="_maskDatasetId">
+                            <option value="">-- None (Filter Attributes Only) --</option>
+                            @foreach (var ds in State.Datasets)
+                            {
+                                <option value="@ds.Id">@ds.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="attr-field-input">Property Field Name:</label>
+                        <input id="attr-field-input" class="form-control" placeholder="e.g. population, magnitude" @bind="_filterField" />
+                    </div>
+                    <div style="display: grid; grid-template-columns: 110px 1fr; gap: var(--space-2);">
+                        <div class="form-group">
+                            <label for="attr-op-select">Operator:</label>
+                            <select id="attr-op-select" class="form-control" @bind="_filterOp">
+                                <option value=">">&gt;</option>
+                                <option value=">=">&gt;=</option>
+                                <option value="<">&lt;</option>
+                                <option value="<=">&lt;=</option>
+                                <option value="=">=</option>
+                                <option value="!=">!=</option>
+                                <option value="contains">contains</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="attr-val-input">Value:</label>
+                            <input id="attr-val-input" class="form-control" placeholder="Comparison value..." @bind="_filterValue" />
+                        </div>
+                    </div>
+                }
+                else if (currentTool.Key == "random_points")
+                {
+                    <div class="form-group">
+                        <label for="points-count-input">Number of Points:</label>
+                        <input id="points-count-input" type="number" min="10" max="5000" class="form-control" @bind="_pointCount" />
+                    </div>
+                }
+                else if (currentTool.Key == "overlay")
+                {
+                    <div class="form-group">
+                        <label for="overlay-op-select">Overlay Operation:</label>
+                        <select id="overlay-op-select" class="form-control" @bind="_overlayOp">
+                            <option value="intersection">Intersection (A ∩ B)</option>
+                            <option value="difference">Difference (A − B)</option>
+                            <option value="symmetric_difference">Symmetric Difference (A △ B)</option>
+                            <option value="clip">Clip (keep A inside B)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="overlay-boundary-select">Boundary / Overlay Dataset (B):</label>
+                        <select id="overlay-boundary-select" class="form-control" @bind="_overlayDatasetId">
+                            <option value="">-- Select Boundary Layer --</option>
+                            @foreach (var ds in State.Datasets)
+                            {
+                                <option value="@ds.Id">@ds.Name</option>
+                            }
+                        </select>
+                        @if (State.Datasets.Count == 0)
+                        {
+                            <span class="form-hint">Import a polygon dataset first.</span>
+                        }
+                    </div>
+                }
+                else if (currentTool.Key == "dissolve")
+                {
+                    <div class="form-group">
+                        <label for="dissolve-field-input">Group By Field (optional):</label>
+                        <input id="dissolve-field-input" class="form-control" placeholder="e.g. land_use — leave empty to merge everything"
+                               value="@_groupField" @onchange="@(e => _groupField = e.Value?.ToString() ?? "")" />
+                    </div>
+                }
+                else if (currentTool.Key == "spatial_join")
+                {
+                    <div class="form-group">
+                        <label for="join-target-select">Polygon Target Dataset:</label>
+                        <select id="join-target-select" class="form-control" @bind="_overlayDatasetId">
+                            <option value="">-- Select Target Layer --</option>
+                            @foreach (var ds in State.Datasets)
+                            {
+                                <option value="@ds.Id">@ds.Name</option>
+                            }
+                        </select>
+                    </div>
+                }
+
+                <div style="margin-top: auto; padding-top: var(--space-4); display: flex; gap: var(--space-2);">
+                    <button class="btn btn-primary" style="flex: 1; padding: 8px 14px;" @onclick="Execute" disabled="@(_isRunning || string.IsNullOrEmpty(_datasetId))" aria-label="Execute Calculation">
+                        @if (_isRunning)
+                        {
+                            <span class="geoviz-spinner" style="width: 14px; height: 14px;"></span>
+                            <span>Processing...</span>
+                        }
+                        else
+                        {
+                            <LucideIcon Name="play" Size="13" Color="#ffffff" />
+                            <span>Run Analysis</span>
+                        }
+                    </button>
+                </div>
+
+                @if (!string.IsNullOrEmpty(_runError))
+                {
+                    <div style="background-color: var(--color-danger-bg); border: 1px solid var(--color-danger); color: var(--color-danger); padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); font-size: 11px; font-family: var(--font-mono); margin-top: var(--space-2);" role="alert">
+                        @(_runError)
+                    </div>
+                }
+            }
+        </article>
+
+        <!-- 3. Results -->
+        <aside class="calc-results-panel" aria-label="Calculation Telemetry & Outputs">
+            <header class="results-header">
+                <span style="font-size: 11px; font-weight: 700; color: var(--text-primary);">Analysis Telemetry</span>
+                @if (State.LastResult is { } r)
+                {
+                    <span class="brand-badge">@(r.ExecutionTimeMs)ms</span>
+                }
+            </header>
+
+            @if (State.LastResult is { } result)
+            {
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <span class="metric-label">Status</span>
+                        <span class="metric-value" style="color: var(--color-success); font-size: 12px;">SUCCESS</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-label">Execution</span>
+                        <span class="metric-value">@(result.ExecutionTimeMs)ms</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-label">Output Features</span>
+                        <span class="metric-value">@result.FeatureCount</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-label">CRS</span>
+                        <span class="metric-value" style="font-size: 11px;">EPSG:4326</span>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-2);">
+                    <button class="btn btn-primary btn-sm" @onclick="AddToMap" disabled="@_isAdding" aria-label="Add Result to Map Layer">
+                        <LucideIcon Name="map" Size="12" Color="#ffffff" />
+                        <span>Add to Map Canvas</span>
+                    </button>
+                    <button class="btn btn-secondary btn-sm" @onclick="DownloadResult" aria-label="Download Result GeoJSON">
+                        <LucideIcon Name="download" Size="12" />
+                        <span>Download GeoJSON</span>
+                    </button>
+                    <button class="btn btn-secondary btn-sm" @onclick="CopyResult" aria-label="Copy Result GeoJSON">
+                        <LucideIcon Name="copy" Size="12" />
+                        <span>Copy to Clipboard</span>
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div style="text-align: center; padding: 48px 12px; color: var(--text-muted);">
+                    <div style="margin-bottom: 8px;">
+                        <LucideIcon Name="activity" Size="28" Color="var(--text-muted)" />
+                    </div>
+                    <p style="font-weight: 600; color: var(--text-secondary);">No Output Yet</p>
+                    <p style="font-size: 10px; margin-top: 4px;">Select tool parameters and click 'Run Analysis' to inspect results.</p>
+                </div>
+            }
+        </aside>
+    </section>
+</main>
+
+@code {
+    private string _datasetId = string.Empty;
+    private string _maskDatasetId = string.Empty;
+    private string _overlayDatasetId = string.Empty;
+    private string _overlayOp = "intersection";
+    private string _groupField = "";
+    private double _bufferDistance = 50000;
+    private double _tolerance = 0.05;
+    private string _gridType = "hexbin";
+    private double _cellSizeKm = 100;
+    private string _filterField = "";
+    private string _filterOp = ">";
+    private string _filterValue = "0";
+    private int _pointCount = 100;
+
+    private bool _isRunning;
+    private bool _isAdding;
+    private string? _runError;
+
+    protected override void OnInitialized()
+    {
+        State.Changed += OnStateChanged;
+        // Keep the dataset selector usable as datasets come and go.
+        if (State.Datasets.Count > 0 && string.IsNullOrEmpty(_datasetId))
+            _datasetId = State.Datasets[0].Id;
+    }
+
+    public void Dispose() => State.Changed -= OnStateChanged;
+
+    private void OnStateChanged()
+    {
+        if (State.Datasets.Count > 0 && string.IsNullOrEmpty(_datasetId))
+            _datasetId = State.Datasets[0].Id;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CloseTab(string id) => await State.CloseTabAsync(id);
+
+    private async Task SetTool(string toolKey)
+    {
+        if (State.ActiveTab is { } tab && tab.ActiveTool != toolKey)
+        {
+            tab.ActiveTool = toolKey;
+            await State.UpdateTabAsync(tab);
+        }
+    }
+
+    private Dictionary<string, object?> BuildParameters(string tool) => tool switch
+    {
+        "buffer" => new() { ["distance_meters"] = _bufferDistance, ["steps"] = 16 },
+        "convex_hull" => new() { ["per_feature"] = false },
+        "bbox" => new() { ["per_feature"] = false },
+        "simplify" => new() { ["tolerance_deg"] = _tolerance },
+        "spatial_binning" => new() { ["grid_type"] = _gridType, ["cell_size_km"] = _cellSizeKm },
+        "spatial_query" => new()
+        {
+            ["spatial_relation"] = "intersects",
+            ["filter_dataset_id"] = string.IsNullOrEmpty(_maskDatasetId) ? null : _maskDatasetId,
+            ["attribute_field"] = string.IsNullOrWhiteSpace(_filterField) ? null : _filterField.Trim(),
+            ["attribute_op"] = _filterOp,
+            ["attribute_val"] = string.IsNullOrWhiteSpace(_filterValue) ? null : _filterValue
+        },
+        "random_points" => new() { ["count"] = _pointCount, ["restrict_to_polygons"] = false },
+        "overlay" => new()
+        {
+            ["operation"] = _overlayOp,
+            ["filter_dataset_id"] = string.IsNullOrEmpty(_overlayDatasetId) ? null : _overlayDatasetId
+        },
+        "dissolve" => new() { ["group_field"] = string.IsNullOrWhiteSpace(_groupField) ? null : _groupField.Trim() },
+        "spatial_join" => new()
+        {
+            ["filter_dataset_id"] = string.IsNullOrEmpty(_overlayDatasetId) ? null : _overlayDatasetId
+        },
+        _ => new()
+    };
+
+    private async Task Execute()
+    {
+        var tab = State.ActiveTab;
+        if (tab is null || string.IsNullOrEmpty(_datasetId) || _isRunning) return;
+
+        _isRunning = true;
+        _runError = null;
+        try
+        {
+            await State.RunToolAsync(tab.ActiveTool, _datasetId, BuildParameters(tab.ActiveTool));
+            try
+            {
+                await JsRuntime.InvokeVoidAsync("geoVizMotion.pulseElement", ".metrics-grid");
+            }
+            catch { /* best effort */ }
+        }
+        catch (Exception ex)
+        {
+            _runError = StripWrapper(ex.Message);
+        }
+        finally
+        {
+            _isRunning = false;
+        }
+    }
+
+    private async Task AddToMap()
+    {
+        if (_isAdding) return;
+        _isAdding = true;
+        try
+        {
+            await State.AddResultAsLayerAsync();
+        }
+        catch (Exception ex)
+        {
+            _runError = StripWrapper(ex.Message);
+        }
+        finally
+        {
+            _isAdding = false;
+        }
+    }
+
+    private async Task DownloadResult()
+    {
+        if (State.LastResult is not { } result || string.IsNullOrEmpty(result.OutputGeojson)) return;
+        var file = $"{result.LayerName.Replace(' ', '_')}.geojson";
+        await JsRuntime.InvokeVoidAsync("geoVizMap.downloadFile", file, result.OutputGeojson, "application/geo+json");
+    }
+
+    private async Task CopyResult()
+    {
+        if (State.LastResult is not { } result) return;
+        await JsRuntime.InvokeVoidAsync("navigator.clipboard.writeText", result.OutputGeojson);
+    }
+
+    /// <summary>Tauri wraps IPC errors; strip the redundant prefix for display.</summary>
+    private static string StripWrapper(string message)
+    {
+        var marker = "Geoprocessing failed:";
+        var idx = message.IndexOf(marker, StringComparison.Ordinal);
+        return idx >= 0 ? message[(idx + marker.Length + 1)..] : message;
+    }
+}

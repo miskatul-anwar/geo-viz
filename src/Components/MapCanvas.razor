@@ -1,0 +1,278 @@
+@inject AppState State
+@inject IJSRuntime JsRuntime
+@implements IDisposable
+
+<section class="map-canvas-wrapper" aria-label="Interactive Vector GIS Map Canvas">
+    <div id="map-container" tabindex="0" role="region" aria-label="Geographic Vector Map View"></div>
+
+    <nav class="map-floating-toolbar" role="toolbar" aria-label="Map Analysis Tools">
+        <button class="btn btn-secondary btn-sm" @onclick="FitAllLayers" title="Zoom to fit all data extents" aria-label="Zoom to Full Extent">
+            <LucideIcon Name="maximize" Size="13" />
+            <span>Full Extent</span>
+        </button>
+        <button class="btn btn-secondary btn-sm @(_measureMode == "distance" ? "active" : "")" @onclick='() => SetMeasureMode("distance")' title="Measure polyline distance on map" aria-label="Measure Distance">
+            <LucideIcon Name="ruler" Size="13" />
+            <span>Distance</span>
+        </button>
+        <button class="btn btn-secondary btn-sm @(_measureMode == "area" ? "active" : "")" @onclick='() => SetMeasureMode("area")' title="Measure polygon area on map" aria-label="Measure Area">
+            <LucideIcon Name="compass" Size="13" />
+            <span>Area</span>
+        </button>
+        <button class="btn btn-secondary btn-sm" @onclick="ClearMeasurements" title="Clear measurement overlays" aria-label="Clear Measurements">
+            <LucideIcon Name="eraser" Size="13" />
+            <span>Clear</span>
+        </button>
+        <button class="btn btn-secondary btn-sm @(_showBookmarks ? "active" : "")" @onclick="() => _showBookmarks = !_showBookmarks" title="Spatial Bookmarks" aria-label="Spatial Bookmarks">
+            <LucideIcon Name="folder" Size="13" />
+            <span>Bookmarks</span>
+        </button>
+        <button class="btn btn-secondary btn-sm @(IsTableOpen ? "active" : "")" @onclick="ToggleTable" title="Toggle Attribute Table Drawer" aria-label="Toggle Attribute Table">
+            <LucideIcon Name="table" Size="13" />
+            <span>Attributes</span>
+        </button>
+    </nav>
+
+    @if (_showBookmarks)
+    {
+        <aside class="bookmark-panel" aria-label="Saved Map Views">
+            <div style="display: flex; gap: var(--space-1); margin-bottom: var(--space-2);">
+                <input class="form-control" style="flex: 1; padding: 2px 6px; font-size: 10px;"
+                       placeholder="Bookmark name..." @bind="_bookmarkName" aria-label="Bookmark Name" />
+                <button class="btn btn-primary btn-sm" style="padding: 2px 8px;" disabled="@string.IsNullOrWhiteSpace(_bookmarkName)"
+                        @onclick="SaveCurrentView" title="Save current map view" aria-label="Save Bookmark">
+                    <LucideIcon Name="plus" Size="11" Color="#ffffff" />
+                </button>
+            </div>
+            @if (State.Bookmarks.Count == 0)
+            {
+                <p style="font-size: 10px; color: var(--text-muted); text-align: center;">No bookmarks saved yet.</p>
+            }
+            else
+            {
+                <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px;">
+                    @foreach (var bookmark in State.Bookmarks)
+                    {
+                        <li style="display: flex; align-items: center; gap: var(--space-1); background-color: var(--bg-surface-raised); border-radius: var(--radius-sm); padding: 2px 6px;">
+                            <button style="flex: 1; text-align: left; font-size: 10.5px; color: var(--text-primary); cursor: pointer;"
+                                    @onclick="() => GoToBookmark(bookmark)" title="Jump to @bookmark.Name">
+                                @bookmark.Name
+                                <span style="color: var(--text-muted); font-family: var(--font-mono); font-size: 9px;">
+                                    (@bookmark.CenterLat.ToString("F2"), @bookmark.CenterLng.ToString("F2"))
+                                </span>
+                            </button>
+                            <button class="btn btn-icon btn-sm btn-danger" @onclick="@(async _ => await State.DeleteBookmarkAsync(bookmark.Id))" aria-label="Delete Bookmark">
+                                <LucideIcon Name="x" Size="10" />
+                            </button>
+                        </li>
+                    }
+                </ul>
+            }
+        </aside>
+    }
+
+    @if (VisibleLayerCount == 0)
+    {
+        <div class="map-empty-hint" aria-hidden="true">
+            <LucideIcon Name="map" Size="36" Color="var(--text-muted)" />
+            <h3>No layers on the map</h3>
+            <p>Import a GeoJSON, Shapefile, KML/KMZ, GPX or GeoPackage dataset via <strong>Add Layer</strong> in the Layers panel to start exploring.</p>
+        </div>
+    }
+
+    <nav class="map-basemap-selector" role="radiogroup" aria-label="Basemap Imagery Switcher">
+        @foreach (var (key, label) in BasemapOptions)
+        {
+            var basemapKey = key;
+            var isCurrent = _currentBasemap == basemapKey;
+            <button class="basemap-btn @(isCurrent ? "active" : "")"
+                    role="radio"
+                    aria-checked="@isCurrent"
+                    @onclick="@(async () => await ChangeBasemap(basemapKey))"
+                    title="Switch to @label basemap">
+                @label
+            </button>
+        }
+    </nav>
+
+    <footer class="map-statusbar" role="status" aria-live="polite">
+        <div class="statusbar-item">
+            <span>CRS: <strong style="color: var(--accent);">EPSG:4326</strong></span>
+        </div>
+        <div class="statusbar-item">
+            <span>LAT: <strong style="color: var(--text-primary);">@_lat.ToString("F5")°</strong></span>
+            <span>LNG: <strong style="color: var(--text-primary);">@_lng.ToString("F5")°</strong></span>
+            <span>ZOOM: <strong style="color: var(--text-primary);">@_zoom</strong></span>
+        </div>
+        <div class="statusbar-item">
+            <span>Active Layers: <strong style="color: var(--accent);">@VisibleLayerCount</strong></span>
+        </div>
+    </footer>
+</section>
+
+@code {
+    private static readonly (string Key, string Label)[] BasemapOptions =
+    {
+        ("dark", "Dark"), ("light", "Light"), ("osm", "OSM"),
+        ("satellite", "Satellite"), ("topo", "Topo")
+    };
+
+    [Parameter] public bool IsTableOpen { get; set; }
+    [Parameter] public EventCallback OnToggleTable { get; set; }
+
+    private DotNetObjectReference<MapCanvas>? _dotNetRef;
+    private string? _measureMode;
+    private string _currentBasemap = "dark";
+    private double _lat, _lng;
+    private int _zoom = 2;
+    private bool _mapReady;
+    private bool _showBookmarks;
+    private string _bookmarkName = "";
+
+    /// <summary>layerId -> applied state signature; prevents redundant heavy layer rebuilds.</summary>
+    private readonly Dictionary<string, string> _syncSignatures = new();
+
+    private int VisibleLayerCount => State.Layers.Count(l => l.IsVisible);
+
+    protected override void OnInitialized()
+    {
+        State.Changed += OnStateChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        _dotNetRef = DotNetObjectReference.Create(this);
+        await JsRuntime.InvokeVoidAsync("geoVizMap.initMap", "map-container", _dotNetRef);
+        _mapReady = true;
+        await SyncMapAsync();
+    }
+
+    public void Dispose()
+    {
+        State.Changed -= OnStateChanged;
+        _dotNetRef?.Dispose();
+    }
+
+    private void OnStateChanged() => _ = InvokeAsync(async () =>
+    {
+        StateHasChanged();
+        if (_mapReady) await SyncMapAsync();
+    });
+
+    // ------------------------------------------------------------------
+    // Map synchronization (signature-diffed, no redundant IPC)
+    // ------------------------------------------------------------------
+
+    private async Task SyncMapAsync()
+    {
+        try
+        {
+            foreach (var layer in State.Layers)
+            {
+                var detail = await State.ResolveDatasetAsync(layer.DatasetId);
+                if (string.IsNullOrEmpty(detail?.Geojson)) continue;
+
+                var signature =
+                    $"{detail.Geojson.Length}|{layer.IsVisible}|{StyleSignature(layer)}";
+                if (_syncSignatures.TryGetValue(layer.Id, out var known) && known == signature && layer.IsVisible)
+                    continue;
+
+                if (!layer.IsVisible)
+                {
+                    if (_syncSignatures.ContainsKey(layer.Id))
+                        await JsRuntime.InvokeVoidAsync("geoVizMap.setLayerVisibility", layer.Id, false);
+                    continue;
+                }
+
+                await JsRuntime.InvokeVoidAsync(
+                    "geoVizMap.addOrUpdateGeoJsonLayer",
+                    layer.Id, detail.Geojson, layer.Style, true, layer.Opacity);
+                _syncSignatures[layer.Id] = signature;
+            }
+
+            // Remove layers deleted from state.
+            foreach (var staleId in _syncSignatures.Keys.Where(id => State.Layers.All(l => l.Id != id)).ToList())
+            {
+                await JsRuntime.InvokeVoidAsync("geoVizMap.removeLayer", staleId);
+                _syncSignatures.Remove(staleId);
+            }
+        }
+        catch (Exception)
+        {
+            /* JS bridge unavailable during teardown; non-fatal */
+        }
+    }
+
+    private static string StyleSignature(Layer layer)
+    {
+        var s = layer.Style;
+        var cls = s.Classification is { } c ? $"{c.Field}:{c.Method}:{c.Breaks.Count}:{string.Join(',', c.Breaks.Select(b => b.Color))}" : "";
+        return $"{s.FillColor}{s.StrokeColor}{s.StrokeWidth}{s.PointRadius}{s.FillOpacity}{s.StrokeOpacity}{layer.Opacity}{s.ShapeType}|{cls}|{s.LabelField}";
+    }
+
+    private async Task SaveCurrentView()
+    {
+        if (string.IsNullOrWhiteSpace(_bookmarkName) || !_mapReady) return;
+        try
+        {
+            var view = await JsRuntime.InvokeAsync<ViewState>("geoVizMap.getView");
+            if (view is not null)
+            {
+                await State.AddBookmarkAsync(_bookmarkName.Trim(), view.Lat, view.Lng, view.Zoom);
+                _bookmarkName = "";
+            }
+        }
+        catch
+        {
+            /* bridge unavailable; non-fatal */
+        }
+    }
+
+    private async Task GoToBookmark(MapBookmark bookmark)
+    {
+        await JsRuntime.InvokeVoidAsync("geoVizMap.setView", bookmark.CenterLat, bookmark.CenterLng, bookmark.Zoom);
+        _showBookmarks = false;
+    }
+
+    private sealed record ViewState(double Lat, double Lng, double Zoom);
+
+    [JSInvokable]
+    public void OnMapMouseMove(double lat, double lng, int zoom)
+    {
+        _lat = lat;
+        _lng = lng;
+        _zoom = zoom;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>Feature click on the map selects the owning layer in the TOC.</summary>
+    [JSInvokable]
+    public async Task OnFeatureSelected(string layerId, string propertiesJson)
+    {
+        if (State.ActiveLayerId != layerId)
+            await State.SelectLayerAsync(layerId);
+    }
+
+    private async Task ChangeBasemap(string key)
+    {
+        _currentBasemap = key;
+        await JsRuntime.InvokeVoidAsync("geoVizMap.switchBasemap", key);
+    }
+
+    private async Task FitAllLayers() => await JsRuntime.InvokeVoidAsync("geoVizMap.resetView");
+
+    private async Task SetMeasureMode(string mode)
+    {
+        _measureMode = _measureMode == mode ? null : mode;
+        await JsRuntime.InvokeVoidAsync("geoVizMap.setMeasureMode", _measureMode);
+    }
+
+    private async Task ClearMeasurements() => await JsRuntime.InvokeVoidAsync("geoVizMap.clearMeasurements");
+
+    private async Task ToggleTable()
+    {
+        if (OnToggleTable.HasDelegate)
+            await OnToggleTable.InvokeAsync();
+    }
+}

@@ -1,0 +1,341 @@
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@inject AppState State
+@inject IJSRuntime JsRuntime
+
+<section class="@DrawerClass" aria-label="Attribute Data Table" role="region">
+    <header class="table-drawer-header">
+        <div class="table-drawer-title">
+            <LucideIcon Name="table" Size="13" Color="var(--accent)" />
+            <span>Attribute Table</span>
+            @if (State.ActiveLayer is { } activeLayer)
+            {
+                <span class="brand-badge">@activeLayer.Name</span>
+                <span class="layer-meta-badge">(@FilteredRows.Count / @AllRows.Count features)</span>
+            }
+        </div>
+
+        <div style="display: flex; align-items: center; gap: var(--space-2);">
+            <input class="table-search-input" placeholder="Search attributes..."
+                   value="@SearchQuery" @oninput="OnSearchInput"
+                   aria-label="Search attributes" />
+
+            @if (NumericColumns.Count > 0)
+            {
+                <select class="form-control" style="padding: 2px 6px; font-size: 10px; width: 130px;"
+                        value="@SelectedStatColumn" @onchange="OnStatColumnChanged"
+                        aria-label="Select column for statistics">
+                    <option value="">-- Column Stats --</option>
+                    @foreach (var col in NumericColumns)
+                    {
+                        <option value="@col">Stats: @col</option>
+                    }
+                </select>
+            }
+
+            <button class="btn btn-secondary btn-sm" @onclick="ExportTableCsv" title="Export table to CSV" aria-label="Export to CSV">
+                <LucideIcon Name="download" Size="11" />
+                <span>CSV</span>
+            </button>
+            <button class="btn btn-secondary btn-sm" @onclick="ToggleCollapse" title="Toggle Table Drawer" aria-label="Toggle Table Drawer">
+                <LucideIcon Name="@(IsCollapsed ? "chevron-up" : "chevron-down")" Size="11" />
+                <span>@CollapseButtonText</span>
+            </button>
+        </div>
+    </header>
+
+    @if (HasStats)
+    {
+        <aside style="background-color: var(--bg-app); padding: 4px 14px; display: flex; flex-wrap: wrap; gap: 16px; font-size: 10px; border-bottom: 1px solid var(--border-subtle); font-family: var(--font-mono); color: var(--text-secondary);" aria-label="Summary Statistics">
+            <span>Field: <strong style="color: var(--accent);">@SelectedStatColumn</strong></span>
+            <span>Count: <strong>@StatCount</strong></span>
+            <span>Min: <strong>@StatMin.ToString("F2")</strong></span>
+            <span>Max: <strong>@StatMax.ToString("F2")</strong></span>
+            <span>Mean: <strong>@StatMean.ToString("F2")</strong></span>
+            <span>Sum: <strong>@StatSum.ToString("F2")</strong></span>
+        </aside>
+    }
+
+    <div class="table-container">
+        @if (Columns.Count == 0 || FilteredRows.Count == 0)
+        {
+            <div style="text-align: center; padding: 36px; color: var(--text-muted);">
+                <span>No feature attribute records to display.</span>
+            </div>
+        }
+        else
+        {
+            <table class="data-table" role="grid" aria-label="Feature Attribute Grid">
+                <thead>
+                    <tr role="row">
+                        <th scope="col" style="width: 36px;" role="columnheader">#</th>
+                        @foreach (var col in Columns)
+                        {
+                            var c = col;
+                            <th scope="col" @onclick="() => SortBy(c)" style="cursor: pointer;" role="columnheader" title="Sort by @c">
+                                @c @GetSortIndicator(c)
+                            </th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    <Virtualize Items="@IndexedRows" ItemSize="26" OverscanCount="20" Context="entry">
+                        <tr class="@(SelectedRowIndex == entry.Index ? "selected" : "")"
+                            @onclick="() => SelectRow(entry.Index)" role="row" tabindex="0" title="Click to zoom to feature">
+                            <td style="color: var(--text-muted); font-family: var(--font-mono);" role="gridcell">@(entry.Index + 1)</td>
+                            @foreach (var col in Columns)
+                            {
+                                <td role="gridcell">@(entry.Row.TryGetValue(col, out var v) ? v : "-")</td>
+                            }
+                        </tr>
+                    </Virtualize>
+                </tbody>
+            </table>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter] public bool IsCollapsed { get; set; } = true;
+    [Parameter] public EventCallback<bool> OnToggleCollapse { get; set; }
+
+    public string DrawerClass => IsCollapsed ? "attribute-table-drawer collapsed" : "attribute-table-drawer";
+    public string CollapseButtonText => IsCollapsed ? "Expand Table" : "Collapse Table";
+
+    private List<string> Columns { get; set; } = new();
+    private List<string> NumericColumns { get; set; } = new();
+    private List<Dictionary<string, string>> AllRows { get; set; } = new();
+    private List<Dictionary<string, string>> FilteredRows { get; set; } = new();
+    private List<(int Index, Dictionary<string, string> Row)> IndexedRows { get; set; } = new();
+    private List<(double lng, double lat)> RowCoordinates { get; set; } = new();
+
+    private string SearchQuery { get; set; } = string.Empty;
+    private string SortColumn { get; set; } = string.Empty;
+    private bool SortAsc { get; set; } = true;
+    private int? SelectedRowIndex { get; set; }
+    private string? SelectedStatColumn { get; set; }
+
+    private bool HasStats { get; set; }
+    private int StatCount { get; set; }
+    private double StatMin { get; set; }
+    private double StatMax { get; set; }
+    private double StatMean { get; set; }
+    private double StatSum { get; set; }
+
+    /// <summary>Signature of the dataset the table was built from.</summary>
+    private string? _loadedDatasetKey;
+
+    protected override void OnInitialized() => State.Changed += OnStateChanged;
+
+    public void Dispose() => State.Changed -= OnStateChanged;
+
+    private void OnStateChanged()
+    {
+        var layer = State.ActiveLayer;
+        var detail = State.ActiveDataset;
+        var key = detail is null ? null : $"{detail.Id}:{detail.Geojson.Length}";
+        if (!string.Equals(_loadedDatasetKey, key, StringComparison.Ordinal))
+        {
+            _loadedDatasetKey = key;
+            ParseDatasetFeatures(detail);
+        }
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void OnSearchInput(ChangeEventArgs e)
+    {
+        SearchQuery = e.Value?.ToString() ?? "";
+        UpdateFilteredRows();
+    }
+
+    public void OnStatColumnChanged(ChangeEventArgs e)
+    {
+        SelectedStatColumn = e.Value?.ToString();
+        CalculateStats();
+    }
+
+    private void ParseDatasetFeatures(DatasetDetail? dataset)
+    {
+        Columns.Clear();
+        NumericColumns.Clear();
+        AllRows.Clear();
+        RowCoordinates.Clear();
+        SelectedStatColumn = null;
+        HasStats = false;
+
+        if (string.IsNullOrEmpty(dataset?.Geojson))
+        {
+            FilteredRows.Clear();
+            return;
+        }
+
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(dataset.Geojson);
+            var root = doc.RootElement;
+            if (!root.TryGetProperty("features", out var features) || features.ValueKind != System.Text.Json.JsonValueKind.Array)
+            {
+                FilteredRows.Clear();
+                return;
+            }
+
+            var colSet = new HashSet<string>();
+            var numColSet = new HashSet<string>();
+
+            foreach (var feat in features.EnumerateArray())
+            {
+                var row = new Dictionary<string, string>();
+                double lng = 0, lat = 0;
+
+                if (feat.TryGetProperty("geometry", out var geom) && geom.ValueKind == System.Text.Json.JsonValueKind.Object &&
+                    geom.TryGetProperty("coordinates", out var coords))
+                {
+                    ExtractFirstPoint(coords, out lng, out lat);
+                }
+                RowCoordinates.Add((lng, lat));
+
+                if (feat.TryGetProperty("properties", out var props) && props.ValueKind == System.Text.Json.JsonValueKind.Object)
+                {
+                    foreach (var p in props.EnumerateObject())
+                    {
+                        colSet.Add(p.Name);
+                        row[p.Name] = p.Value.ValueKind switch
+                        {
+                            System.Text.Json.JsonValueKind.String => p.Value.GetString() ?? "",
+                            _ => p.Value.ToString()
+                        };
+
+                        if (p.Value.ValueKind == System.Text.Json.JsonValueKind.Number)
+                            numColSet.Add(p.Name);
+                    }
+                }
+                AllRows.Add(row);
+            }
+
+            Columns = colSet.OrderBy(c => c).ToList();
+            NumericColumns = numColSet.OrderBy(c => c).ToList();
+            UpdateFilteredRows();
+        }
+        catch
+        {
+            FilteredRows.Clear();
+        }
+    }
+
+    private static void ExtractFirstPoint(System.Text.Json.JsonElement coords, out double lng, out double lat)
+    {
+        lng = 0;
+        lat = 0;
+        if (coords.ValueKind != System.Text.Json.JsonValueKind.Array) return;
+        var arr = coords.EnumerateArray().ToList();
+        if (arr.Count >= 2 && arr[0].ValueKind == System.Text.Json.JsonValueKind.Number && arr[1].ValueKind == System.Text.Json.JsonValueKind.Number)
+        {
+            lng = arr[0].GetDouble();
+            lat = arr[1].GetDouble();
+        }
+        else if (arr.Count > 0 && arr[0].ValueKind == System.Text.Json.JsonValueKind.Array)
+        {
+            ExtractFirstPoint(arr[0], out lng, out lat);
+        }
+    }
+
+    public void UpdateFilteredRows()
+    {
+        IEnumerable<Dictionary<string, string>> list = AllRows;
+        if (!string.IsNullOrWhiteSpace(SearchQuery))
+        {
+            var q = SearchQuery.ToLowerInvariant();
+            list = list.Where(r => r.Values.Any(v => v.ToLowerInvariant().Contains(q)));
+        }
+
+        if (!string.IsNullOrEmpty(SortColumn))
+        {
+            list = SortAsc
+                ? list.OrderBy(r => r.TryGetValue(SortColumn, out var v) ? v : "")
+                : list.OrderByDescending(r => r.TryGetValue(SortColumn, out var v) ? v : "");
+        }
+
+        FilteredRows = list.ToList();
+        IndexedRows = FilteredRows.Select((row, index) => (index, row)).ToList();
+    }
+
+    public void SortBy(string column)
+    {
+        if (SortColumn == column)
+        {
+            SortAsc = !SortAsc;
+        }
+        else
+        {
+            SortColumn = column;
+            SortAsc = true;
+        }
+        UpdateFilteredRows();
+    }
+
+    public async Task SelectRow(int index)
+    {
+        SelectedRowIndex = index;
+        if (index >= 0 && index < RowCoordinates.Count)
+        {
+            var (lng, lat) = RowCoordinates[index];
+            if (lng != 0 || lat != 0)
+                await JsRuntime.InvokeVoidAsync("geoVizMap.zoomToFeature", lng, lat, 10);
+        }
+    }
+
+    public void CalculateStats()
+    {
+        if (string.IsNullOrEmpty(SelectedStatColumn))
+        {
+            HasStats = false;
+            return;
+        }
+
+        var values = AllRows
+            .Select(r => r.TryGetValue(SelectedStatColumn, out var s) && double.TryParse(s, out var n) ? n : (double?)null)
+            .Where(v => v.HasValue)
+            .Select(v => v!.Value)
+            .ToList();
+
+        if (values.Count == 0)
+        {
+            HasStats = false;
+            return;
+        }
+
+        StatCount = values.Count;
+        StatMin = values.Min();
+        StatMax = values.Max();
+        StatSum = values.Sum();
+        StatMean = StatSum / values.Count;
+        HasStats = true;
+    }
+
+    public async Task ToggleCollapse()
+    {
+        if (OnToggleCollapse.HasDelegate)
+            await OnToggleCollapse.InvokeAsync(!IsCollapsed);
+    }
+
+    public async Task ExportTableCsv()
+    {
+        if (Columns.Count == 0 || AllRows.Count == 0) return;
+        var lines = new List<string> { string.Join(",", Columns.Select(EscapeCsv)) };
+        foreach (var r in AllRows)
+        {
+            lines.Add(string.Join(",", Columns.Select(c => EscapeCsv(r.TryGetValue(c, out var v) ? v : ""))));
+        }
+        var csv = string.Join("\n", lines);
+        var name = State.ActiveLayer?.Name ?? "attributes";
+        await JsRuntime.InvokeVoidAsync("geoVizMap.downloadFile", $"{name}_attributes.csv", csv, "text/csv");
+    }
+
+    private static string EscapeCsv(string value)
+    {
+        var escaped = value.Replace("\"", "\"\"");
+        return "\"" + escaped + "\"";
+    }
+
+    public string GetSortIndicator(string col) =>
+        SortColumn != col ? "" : SortAsc ? "^" : "v";
+}

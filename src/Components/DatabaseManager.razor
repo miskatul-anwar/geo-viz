@@ -1,0 +1,170 @@
+@using System.Text.Json
+@inject IJSRuntime JsRuntime
+
+<section class="db-studio-layout" aria-label="SQLite Spatial Database & SQL Console">
+    <!-- Left: Dataset Catalog & Storage Stats -->
+    <aside class="db-catalog-sidebar" aria-label="Database Storage Catalog">
+        <div class="sidebar-title">
+            <LucideIcon Name="database" Size="14" Color="var(--accent)" />
+            <span>SQLite Engine (SQLx)</span>
+        </div>
+
+        @if (Stats != null)
+        {
+            <div style="background-color: var(--bg-surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2);">
+                <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                    <span style="color: var(--text-secondary);">Database Size:</span>
+                    <strong style="font-family: var(--font-mono); color: var(--accent);">@(Stats.DbSizeBytes / 1024) KB</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                    <span style="color: var(--text-secondary);">Stored Datasets:</span>
+                    <strong style="font-family: var(--font-mono);">@Stats.DatasetCount</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                    <span style="color: var(--text-secondary);">Active Layers:</span>
+                    <strong style="font-family: var(--font-mono);">@Stats.LayerCount</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                    <span style="color: var(--text-secondary);">Calculations Logged:</span>
+                    <strong style="font-family: var(--font-mono);">@Stats.CalculationCount</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                    <span style="color: var(--text-secondary);">WAL Mode:</span>
+                    <strong style="color: var(--color-success); font-family: var(--font-mono);">ENABLED</strong>
+                </div>
+            </div>
+        }
+
+        <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-top: var(--space-2);">
+            Dataset Inventory
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: var(--space-1);" role="list">
+            @foreach (var ds in Datasets)
+            {
+                <div style="background-color: var(--bg-surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: var(--space-2); display: flex; justify-content: space-between; align-items: center;" role="listitem">
+                    <div style="overflow: hidden;">
+                        <div style="font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@ds.Name</div>
+                        <div style="font-size: 9px; color: var(--text-muted); font-family: var(--font-mono);">@ds.FeatureCount feats</div>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" @onclick="() => SelectDatasetForConsole(ds.Id)" title="Query in SQL Console" aria-label="Query @ds.Name">
+                        <LucideIcon Name="zap" Size="11" />
+                    </button>
+                </div>
+            }
+        </div>
+    </aside>
+
+    <!-- Right: SQL Analytical Editor & Results -->
+    <main class="sql-console-container" aria-label="SQL Console Interface">
+        <header style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 14px; font-weight: 800; display: flex; align-items: center; gap: var(--space-2);">
+                <LucideIcon Name="database" Size="16" Color="var(--accent)" />
+                <span>SQL Analytical Console</span>
+            </div>
+            <div style="display: flex; gap: var(--space-2);">
+                <button class="btn btn-secondary btn-sm" @onclick='() => SetSampleSql("SELECT id, name, feature_count, created_at FROM datasets")'>
+                    Datasets Query
+                </button>
+                <button class="btn btn-secondary btn-sm" @onclick='() => SetSampleSql("SELECT id, tab_id, tool_name, execution_time_ms, created_at FROM calculations ORDER BY created_at DESC LIMIT 10")'>
+                    Calculations Log
+                </button>
+                <button class="btn btn-primary btn-sm" @onclick="ExecuteSqlQuery" disabled="@IsExecuting" aria-label="Execute SQL Query">
+                    <LucideIcon Name="play" Size="11" Color="#ffffff" />
+                    <span>Execute SQL</span>
+                </button>
+            </div>
+        </header>
+
+        <textarea class="sql-editor-textarea" @bind="SqlQuery" placeholder="Enter SQL query..." rows="4" aria-label="SQL Editor Input"></textarea>
+
+        @if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <div style="background-color: var(--color-danger-bg); border: 1px solid var(--color-danger); color: var(--color-danger); padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); font-size: 11px; font-family: var(--font-mono); display: flex; align-items: center; gap: var(--space-2);" role="alert">
+                <LucideIcon Name="alert-triangle" Size="14" Color="var(--color-danger)" />
+                <span>@ErrorMessage</span>
+            </div>
+        }
+
+        <!-- Query Results -->
+        @if (QueryResult != null)
+        {
+            <div style="display: flex; flex-direction: column; gap: var(--space-2); flex: 1;">
+                <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary);">
+                    <span>Returned <strong>@QueryResult.RowCount</strong> rows</span>
+                    <span>Execution: <strong style="color: var(--accent);">@(QueryResult.ExecutionTimeMs)ms</strong></span>
+                </div>
+
+                <div class="table-container" style="background-color: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);">
+                    <table class="data-table" role="grid">
+                        <thead>
+                            <tr role="row">
+                                @foreach (var col in QueryResult.Columns)
+                                {
+                                    <th scope="col" role="columnheader">@col</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in QueryResult.Rows)
+                            {
+                                <tr role="row">
+                                    @for (int i = 0; i < QueryResult.Columns.Count; i++)
+                                    {
+                                        var valStr = i < row.Count ? row[i].ToString() : "NULL";
+                                        <td role="gridcell">@valStr</td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </main>
+</section>
+
+@code {
+    [Parameter] public DatabaseStats? Stats { get; set; }
+    [Parameter] public List<DatasetSummary> Datasets { get; set; } = new();
+
+    private string SqlQuery { get; set; } = "SELECT id, name, feature_count, created_at FROM datasets ORDER BY created_at DESC;";
+    private SqlQueryResult? QueryResult { get; set; }
+    private string? ErrorMessage { get; set; }
+    private bool IsExecuting { get; set; }
+
+    [Inject] public TauriService Tauri { get; set; } = default!;
+
+    private void SetSampleSql(string query)
+    {
+        SqlQuery = query;
+        ErrorMessage = null;
+    }
+
+    private void SelectDatasetForConsole(string datasetId)
+    {
+        SqlQuery = $"SELECT id, name, feature_count, properties_schema FROM datasets WHERE id = '{datasetId}';";
+        ErrorMessage = null;
+    }
+
+    private async Task ExecuteSqlQuery()
+    {
+        if (string.IsNullOrWhiteSpace(SqlQuery) || IsExecuting) return;
+
+        IsExecuting = true;
+        ErrorMessage = null;
+        try
+        {
+            QueryResult = await Tauri.ExecuteSqlQueryAsync(SqlQuery);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            QueryResult = null;
+        }
+        finally
+        {
+            IsExecuting = false;
+        }
+    }
+}

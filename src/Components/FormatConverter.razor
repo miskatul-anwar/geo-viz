@@ -1,0 +1,373 @@
+@using System.IO
+@inject IJSRuntime JsRuntime
+@implements IDisposable
+
+<main class="calc-workspace-container" style="padding: var(--space-5); overflow-y: auto;" aria-label="GIS Format Converter Studio">
+    <div style="max-width: 1120px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: var(--space-4);">
+        <header class="config-header">
+            <h2>
+                <LucideIcon Name="refresh-cw" Size="18" Color="var(--accent)" />
+                <span>Spatial Format Converter Studio</span>
+            </h2>
+            <p>Lossless bidirectional conversion across all formats (GeoJSON, Well-Known Text WKT, and CSV coordinate tables) with full file upload and download support.</p>
+        </header>
+
+        <!-- Main Converter Two-Column Grid -->
+        <section style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+            <!-- Source Input Column -->
+            <article style="display: flex; flex-direction: column; gap: var(--space-3); background-color: var(--bg-surface); border: 1px solid var(--border-main); border-radius: var(--radius-md); padding: var(--space-4);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <label for="source-format-select" style="font-weight: 700; font-size: 12px; color: var(--text-primary); display: flex; align-items: center; gap: var(--space-1);">
+                        <LucideIcon Name="file-input" Size="14" Color="var(--accent)" />
+                        <span>Source Format:</span>
+                    </label>
+                    <select id="source-format-select" class="form-control" style="width: 170px;" value="@SourceFormat" @onchange="OnSourceFormatChanged">
+                        <option value="geojson" disabled="@(TargetFormat == "geojson")">GeoJSON (.geojson / .json)</option>
+                        <option value="wkt" disabled="@(TargetFormat == "wkt")">WKT (Well-Known Text)</option>
+                        <option value="csv" disabled="@(TargetFormat == "csv")">CSV Table (.csv)</option>
+                    </select>
+                </div>
+
+                <!-- File Upload Dropzone -->
+                <div class="file-upload-dropzone" style="position: relative; padding: 16px 12px; min-height: 80px;">
+                    <InputFile OnChange="HandleFileSelected" accept=".geojson,.json,.wkt,.csv,.txt" id="converter-file-input" class="hidden-file-input" />
+                    <div class="file-drop-label">
+                        <div style="margin-bottom: 4px;">
+                            <LucideIcon Name="upload-cloud" Size="22" Color="var(--accent)" />
+                        </div>
+                        @if (!string.IsNullOrEmpty(UploadedFileName))
+                        {
+                            <span style="font-weight: 700; color: var(--color-success); font-size: 11.5px;">📁 @UploadedFileName (@UploadedFileSize)</span>
+                            <span style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">File loaded. Click or drop another to replace.</span>
+                        }
+                        else
+                        {
+                            <span style="font-weight: 700; color: var(--text-primary); font-size: 11.5px;">Drag &amp; Drop or Click to Upload File</span>
+                            <span style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;">Supports .geojson, .wkt, .csv, .json, .txt (up to 100MB)</span>
+                        }
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">Source Payload Content:</span>
+                    <button type="button" class="btn btn-secondary btn-sm" @onclick="TriggerJsFilePicker" aria-label="Browse Local File">
+                        <LucideIcon Name="folder" Size="11" />
+                        <span>Browse File...</span>
+                    </button>
+                </div>
+
+                <textarea id="source-input-textarea" class="sql-editor-textarea" style="height: 220px; color: var(--text-primary);" 
+                          placeholder="Paste or edit source content here (GeoJSON, WKT, or CSV table)..." 
+                          @bind="SourceContent"
+                          aria-label="Source format payload"></textarea>
+
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <button class="btn btn-secondary btn-sm" @onclick="ClearSource" aria-label="Clear Source Input">
+                        <LucideIcon Name="eraser" Size="11" />
+                        <span>Clear</span>
+                    </button>
+                    <button class="btn btn-secondary btn-sm" @onclick="SwapFormats" title="Swap source and target formats" aria-label="Swap Formats">
+                        <LucideIcon Name="arrow-left-right" Size="11" />
+                        <span>Swap Formats</span>
+                    </button>
+                </div>
+            </article>
+
+            <!-- Target Output Column -->
+            <article style="display: flex; flex-direction: column; gap: var(--space-3); background-color: var(--bg-surface); border: 1px solid var(--border-main); border-radius: var(--radius-md); padding: var(--space-4);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <label for="target-format-select" style="font-weight: 700; font-size: 12px; color: var(--text-primary); display: flex; align-items: center; gap: var(--space-1);">
+                        <LucideIcon Name="file-output" Size="14" Color="var(--color-success)" />
+                        <span>Target Format:</span>
+                    </label>
+                    <select id="target-format-select" class="form-control" style="width: 170px;" value="@TargetFormat" @onchange="OnTargetFormatChanged">
+                        <option value="geojson" disabled="@(SourceFormat == "geojson")">GeoJSON (.geojson)</option>
+                        <option value="wkt" disabled="@(SourceFormat == "wkt")">WKT (Well-Known Text)</option>
+                        <option value="csv" disabled="@(SourceFormat == "csv")">CSV Table (.csv)</option>
+                    </select>
+                </div>
+
+                <div style="height: 80px; background-color: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 12px;">
+                    @if (IsConverting)
+                    {
+                        <div class="geoviz-spinner" style="width: 18px; height: 18px; margin-bottom: 6px;"></div>
+                        <span style="font-size: 11px; color: var(--accent); font-weight: 600;">Executing conversion: @SourceFormat.ToUpper() &rarr; @TargetFormat.ToUpper()...</span>
+                    }
+                    else if (SourceFormat == TargetFormat)
+                    {
+                        <span style="font-size: 11px; color: var(--color-warning); font-weight: 700;">Identical Formats Selected</span>
+                        <span style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;">Please choose different source and target formats.</span>
+                    }
+                    else if (!string.IsNullOrEmpty(ConvertedOutput))
+                    {
+                        <span style="font-size: 11.5px; color: var(--color-success); font-weight: 700;">Conversion Complete (@SourceFormat.ToUpper() &rarr; @TargetFormat.ToUpper())</span>
+                        <span style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;">Payload ready for export, copy, or visualization.</span>
+                    }
+                    else
+                    {
+                        <span style="font-size: 11px; color: var(--text-muted);">Route: <strong>@SourceFormat.ToUpper() &rarr; @TargetFormat.ToUpper()</strong> (Ready)</span>
+                    }
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">Converted Target Output:</span>
+                    @if (!string.IsNullOrEmpty(ConvertedOutput))
+                    {
+                        <span style="font-size: 10px; font-family: var(--font-mono); color: var(--text-muted);">Length: @ConvertedOutput.Length chars</span>
+                    }
+                </div>
+
+                <textarea id="target-output-textarea" class="sql-editor-textarea" style="height: 220px;" 
+                          readonly 
+                          placeholder="Converted payload will render here upon execution..." 
+                          value="@ConvertedOutput"
+                          aria-label="Converted target payload"></textarea>
+
+                <div style="display: flex; gap: var(--space-2);">
+                    <button class="btn btn-primary btn-sm" style="flex: 1;" @onclick="PerformConversion" 
+                            disabled="@(IsConverting || string.IsNullOrWhiteSpace(SourceContent) || SourceFormat == TargetFormat)" 
+                            aria-label="Execute Format Conversion">
+                        @if (IsConverting)
+                        {
+                            <span class="geoviz-spinner" style="width: 12px; height: 12px;"></span>
+                            <span>Converting...</span>
+                        }
+                        else
+                        {
+                            <LucideIcon Name="zap" Size="12" Color="var(--text-inverse)" />
+                            <span>Convert (@SourceFormat.ToUpper() &rarr; @TargetFormat.ToUpper())</span>
+                        }
+                    </button>
+                    <button class="btn btn-secondary btn-sm" @onclick="CopyOutput" disabled="@string.IsNullOrEmpty(ConvertedOutput)" title="Copy to clipboard" aria-label="Copy Converted Payload">
+                        <LucideIcon Name="copy" Size="11" />
+                        <span>Copy</span>
+                    </button>
+                    <button class="btn btn-secondary btn-sm" @onclick="DownloadOutput" disabled="@string.IsNullOrEmpty(ConvertedOutput)" title="Download converted file" aria-label="Download Converted File">
+                        <LucideIcon Name="download" Size="11" />
+                        <span>Download</span>
+                    </button>
+                </div>
+            </article>
+        </section>
+
+        @if (!string.IsNullOrEmpty(ConversionError))
+        {
+            <div style="background-color: var(--color-danger-bg); border: 1px solid var(--color-danger); color: var(--color-danger); padding: var(--space-3); border-radius: var(--radius-sm); font-size: 11px; font-family: var(--font-mono); display: flex; align-items: center; gap: var(--space-2);" role="alert">
+                <LucideIcon Name="alert-triangle" Size="14" Color="var(--color-danger)" />
+                <span>@ConversionError</span>
+            </div>
+        }
+    </div>
+</main>
+
+@code {
+    private string SourceFormat { get; set; } = "geojson";
+    private string TargetFormat { get; set; } = "csv";
+    private string SourceContent { get; set; } = string.Empty;
+    private string ConvertedOutput { get; set; } = string.Empty;
+    private string? UploadedFileName { get; set; }
+    private string? UploadedFileSize { get; set; }
+    private string? ConversionError { get; set; }
+    private bool IsConverting { get; set; }
+
+    [Inject] public TauriService Tauri { get; set; } = default!;
+
+    private DotNetObjectReference<FormatConverter>? dotNetRef;
+
+    protected override void OnInitialized()
+    {
+        dotNetRef = DotNetObjectReference.Create(this);
+    }
+
+    private void OnSourceFormatChanged(ChangeEventArgs e)
+    {
+        SourceFormat = e.Value?.ToString() ?? "geojson";
+        if (TargetFormat == SourceFormat)
+        {
+            TargetFormat = GetOppositeFormat(SourceFormat);
+        }
+        ConvertedOutput = string.Empty;
+        ConversionError = null;
+    }
+
+    private void OnTargetFormatChanged(ChangeEventArgs e)
+    {
+        TargetFormat = e.Value?.ToString() ?? "csv";
+        if (SourceFormat == TargetFormat)
+        {
+            SourceFormat = GetOppositeFormat(TargetFormat);
+        }
+        ConvertedOutput = string.Empty;
+        ConversionError = null;
+    }
+
+    private string GetOppositeFormat(string fmt) => fmt switch
+    {
+        "geojson" => "csv",
+        "csv" => "geojson",
+        "wkt" => "geojson",
+        _ => "geojson"
+    };
+
+    private async Task TriggerJsFilePicker()
+    {
+        try
+        {
+            if (dotNetRef != null)
+            {
+                await JsRuntime.InvokeVoidAsync("geoVizMap.openFilePicker", dotNetRef);
+            }
+        }
+        catch (Exception ex)
+        {
+            ConversionError = $"Could not open file picker: {ex.Message}";
+        }
+    }
+
+    [JSInvokable]
+    public void OnJsFileSelected(string fileName, long fileSize, string content, bool isBinary)
+    {
+        LoadFileData(fileName, fileSize, content);
+        StateHasChanged();
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        try
+        {
+            const long maxFileSize = 100 * 1024 * 1024; // 100MB
+            using var stream = file.OpenReadStream(maxFileSize);
+            using var reader = new StreamReader(stream);
+            var content = await reader.ReadToEndAsync();
+            LoadFileData(file.Name, file.Size, content);
+        }
+        catch (Exception ex)
+        {
+            ConversionError = $"Failed to read file: {ex.Message}";
+        }
+    }
+
+    private void LoadFileData(string fileName, long fileSize, string content)
+    {
+        UploadedFileName = fileName;
+        UploadedFileSize = fileSize > 1024 * 1024
+            ? $"{(fileSize / (1024.0 * 1024.0)):F2} MB"
+            : $"{(fileSize / 1024.0):F1} KB";
+
+        SourceContent = content;
+        ConversionError = null;
+        ConvertedOutput = string.Empty;
+
+        // Auto-detect source format from extension
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        if (ext == ".csv")
+        {
+            SourceFormat = "csv";
+            TargetFormat = "geojson";
+        }
+        else if (ext == ".wkt")
+        {
+            SourceFormat = "wkt";
+            TargetFormat = "geojson";
+        }
+        else if (ext == ".geojson" || ext == ".json")
+        {
+            SourceFormat = "geojson";
+            TargetFormat = "csv";
+        }
+    }
+
+    private void ClearSource()
+    {
+        SourceContent = string.Empty;
+        UploadedFileName = null;
+        UploadedFileSize = null;
+        ConvertedOutput = string.Empty;
+        ConversionError = null;
+    }
+
+    private void SwapFormats()
+    {
+        var temp = SourceFormat;
+        SourceFormat = TargetFormat;
+        TargetFormat = temp;
+
+        if (!string.IsNullOrEmpty(ConvertedOutput))
+        {
+            SourceContent = ConvertedOutput;
+            ConvertedOutput = string.Empty;
+            UploadedFileName = null;
+            UploadedFileSize = null;
+        }
+    }
+
+    private async Task PerformConversion()
+    {
+        if (string.IsNullOrWhiteSpace(SourceContent)) return;
+        if (SourceFormat == TargetFormat)
+        {
+            ConversionError = "Conversion between the same format is not permitted.";
+            return;
+        }
+
+        IsConverting = true;
+        ConversionError = null;
+        try
+        {
+            ConvertedOutput = await Tauri.ConvertFormatAsync(SourceContent, SourceFormat, TargetFormat);
+        }
+        catch (Exception ex)
+        {
+            ConversionError = ex.Message;
+            ConvertedOutput = string.Empty;
+        }
+        finally
+        {
+            IsConverting = false;
+        }
+    }
+
+    private async Task CopyOutput()
+    {
+        if (!string.IsNullOrEmpty(ConvertedOutput))
+        {
+            await JsRuntime.InvokeVoidAsync("navigator.clipboard.writeText", ConvertedOutput);
+        }
+    }
+
+    private async Task DownloadOutput()
+    {
+        if (string.IsNullOrEmpty(ConvertedOutput)) return;
+
+        var ext = TargetFormat switch
+        {
+            "geojson" => "geojson",
+            "wkt" => "wkt",
+            "csv" => "csv",
+            _ => "txt"
+        };
+
+        var mime = TargetFormat switch
+        {
+            "geojson" => "application/geo+json",
+            "csv" => "text/csv",
+            _ => "text/plain"
+        };
+
+        var baseName = !string.IsNullOrEmpty(UploadedFileName)
+            ? Path.GetFileNameWithoutExtension(UploadedFileName)
+            : "converted_dataset";
+
+        var outFileName = $"{baseName}_converted.{ext}";
+
+        await JsRuntime.InvokeVoidAsync("geoVizMap.downloadFile", outFileName, ConvertedOutput, mime);
+    }
+
+    public void Dispose()
+    {
+        dotNetRef?.Dispose();
+    }
+}

@@ -1,0 +1,109 @@
+@page "/"
+@inject AppState State
+@inject IJSRuntime JsRuntime
+
+<div class="app-container">
+    <header class="app-header" role="banner">
+        <div class="header-brand">
+            <img src="favicon.png" alt="GeoViz Logo" style="width: 22px; height: 22px; border-radius: var(--radius-sm); object-fit: cover;" />
+            <span class="brand-title">GeoViz Pro</span>
+        </div>
+
+        <nav class="header-nav" role="tablist" aria-label="Main View Navigation">
+            @foreach (var (view, icon, label) in Views)
+            {
+                var isCurrent = CurrentView == view;
+                <button class="nav-tab-btn @(isCurrent ? "active" : "")"
+                        role="tab"
+                        aria-selected="@isCurrent"
+                        @onclick="() => SetView(view)">
+                    <LucideIcon Name="@icon" Size="13" />
+                    <span>@label</span>
+                    @(view == AppView.Calculations ? $" ({State.Tabs.Count})" : "")
+                </button>
+            }
+        </nav>
+
+        <div class="header-actions">
+            <button class="btn btn-secondary btn-sm" @onclick="ToggleTheme" title="Toggle Dark / Light Theme" aria-label="Toggle Color Theme">
+                <LucideIcon Name="@(IsDarkTheme ? "moon" : "sun")" Size="13" />
+                <span>@(IsDarkTheme ? "Dark" : "Light")</span>
+            </button>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrEmpty(State.Error))
+    {
+        <div class="error-banner" role="alert">
+            <LucideIcon Name="alert-triangle" Size="14" Color="var(--color-danger)" />
+            <span>@State.Error</span>
+            <button class="btn btn-icon btn-sm btn-secondary" @onclick="() => State.DismissError()" aria-label="Dismiss error">
+                <LucideIcon Name="x" Size="11" />
+            </button>
+        </div>
+    }
+
+    <main class="app-content" role="main">
+        @switch (CurrentView)
+        {
+            case AppView.MapStudio:
+                <MapStudioView />
+                break;
+            case AppView.Calculations:
+                <CalculationWorkspace />
+                break;
+            case AppView.Database:
+                <DatabaseManager />
+                break;
+            case AppView.Converter:
+                <FormatConverter />
+                break;
+        }
+    </main>
+</div>
+
+@code {
+    private enum AppView { MapStudio, Calculations, Database, Converter }
+
+    private static readonly (AppView View, string Icon, string Label)[] Views =
+    {
+        (AppView.MapStudio, "map", "Map Studio"),
+        (AppView.Calculations, "zap", "Spatial Calculations"),
+        (AppView.Database, "database", "SQL & Database"),
+        (AppView.Converter, "refresh-cw", "Format Converter")
+    };
+
+    private AppView CurrentView { get; set; } = AppView.MapStudio;
+    private bool IsDarkTheme { get; set; } = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        State.Changed += OnStateChanged;
+        await State.InitializeAsync();
+    }
+
+    private void OnStateChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SetView(AppView view)
+    {
+        if (CurrentView == view) return;
+        CurrentView = view;
+        try
+        {
+            await JsRuntime.InvokeVoidAsync("geoVizMotion.animateViewIn", ".app-content");
+        }
+        catch
+        {
+            /* animation is best-effort */
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        IsDarkTheme = !IsDarkTheme;
+        await JsRuntime.InvokeVoidAsync("geoVizMap.setTheme", IsDarkTheme ? "dark" : "light");
+    }
+}

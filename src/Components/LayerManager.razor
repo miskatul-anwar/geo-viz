@@ -1,0 +1,312 @@
+@inject AppState State
+@implements IDisposable
+
+<aside class="sidebar-toc" aria-label="Table of Contents & Layers">
+    <header class="sidebar-header">
+        <div class="sidebar-title">
+            <LucideIcon Name="layers" Size="14" Color="var(--accent)" />
+            <span>Layers &amp; TOC</span>
+            <span class="layer-meta-badge">(@State.Layers.Count)</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" @onclick="RequestAddLayer" title="Import new dataset" aria-label="Add New Layer">
+            <LucideIcon Name="plus" Size="11" />
+            <span>Add Layer</span>
+        </button>
+    </header>
+
+    <div class="layer-list-container" role="list">
+        @if (State.Layers.Count == 0)
+        {
+            <div style="text-align: center; padding: 36px 16px; color: var(--text-muted);">
+                <div style="margin-bottom: 8px;">
+                    <LucideIcon Name="folder" Size="32" Color="var(--text-muted)" />
+                </div>
+                <p style="font-weight: 700; color: var(--text-secondary); font-size: 12px;">No Layers Loaded</p>
+                <p style="font-size: 11px; margin-top: 4px; line-height: 1.4;">Click below to add a spatial layer from file or text.</p>
+                <button class="btn btn-primary btn-sm" style="margin-top: 16px;" @onclick="RequestAddLayer" aria-label="Add Spatial Layer">
+                    <LucideIcon Name="plus" Size="12" Color="var(--text-inverse)" />
+                    <span>Add Layer</span>
+                </button>
+            </div>
+        }
+        else
+        {
+            @foreach (var layer in Enumerable.Reverse(State.Layers))
+            {
+                var isExpanded = ExpandedLayerId == layer.Id;
+                var isActive = State.ActiveLayerId == layer.Id;
+
+                <div class="layer-card @(isActive ? "active" : "")" role="listitem" aria-selected="@isActive">
+                    <div class="layer-card-header">
+                        <div class="layer-info" @onclick="() => SelectLayer(layer)" style="cursor: pointer;" title="Select layer @layer.Name">
+                            <input type="checkbox" checked="@layer.IsVisible"
+                                   @onchange="@(_ => ToggleVisibility(layer))"
+                                   @onclick:stopPropagation="true"
+                                   aria-label="Toggle layer visibility for @layer.Name" />
+                            <div class="layer-color-dot" style="background-color: @layer.Style.FillColor; border: 1px solid @layer.Style.StrokeColor;"></div>
+                            <span class="layer-name">@layer.Name</span>
+                        </div>
+                        <div class="layer-actions">
+                            <button class="btn btn-icon btn-sm btn-secondary" @onclick="() => ZoomTo(layer.Id)" title="Zoom to layer extent" aria-label="Zoom to @layer.Name">
+                                <LucideIcon Name="search" Size="11" />
+                            </button>
+                            <button class="btn btn-icon btn-sm btn-secondary" @onclick="() => ToggleExpand(layer.Id)" title="Edit layer symbology" aria-label="Symbology for @layer.Name" aria-expanded="@isExpanded">
+                                <LucideIcon Name="palette" Size="11" />
+                            </button>
+                            <button class="btn btn-icon btn-sm btn-danger" @onclick="() => Delete(layer)" title="Remove layer" aria-label="Remove @layer.Name">
+                                <LucideIcon Name="trash-2" Size="11" />
+                            </button>
+                        </div>
+                    </div>
+
+                    @if (isExpanded)
+                    {
+                        <div class="layer-controls">
+                            <div class="layer-slider-row">
+                                <span style="width: 65px; font-weight: 600;">Shape:</span>
+                                <div class="shape-type-toggle-group" role="radiogroup" aria-label="Shape geometry rendering mode">
+                                    @foreach (var (shape, icon, label) in ShapeOptions)
+                                    {
+                                        var shapeKey = shape;
+                                        <button type="button" class="shape-type-chip @(string.Equals(layer.Style.ShapeType, shape, StringComparison.OrdinalIgnoreCase) ? "active" : "")"
+                                                @onclick='() => SetShapeType(layer, shapeKey)' title="Render as @label">
+                                            <LucideIcon Name="@icon" Size="10" />
+                                            <span>@label</span>
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="layer-slider-row">
+                                <span style="width: 65px;">Colors:</span>
+                                <input type="color" value="@layer.Style.FillColor"
+                                       @onchange="@(e => SetFillColor(layer, e))"
+                                       style="width: 24px; height: 18px; border: none; cursor: pointer;"
+                                       aria-label="Fill Color" />
+                                <span style="width: 45px; font-size: 10px; margin-left: 6px;">Stroke:</span>
+                                <input type="color" value="@layer.Style.StrokeColor"
+                                       @onchange="@(e => SetStrokeColor(layer, e))"
+                                       style="width: 24px; height: 18px; border: none; cursor: pointer;"
+                                       aria-label="Stroke Color" />
+                            </div>
+
+                            <div class="layer-slider-row">
+                                <span style="width: 65px;">Opacity:</span>
+                                <input type="range" min="0" max="1" step="0.05" value="@layer.Opacity"
+                                       @onchange="@(e => SetOpacity(layer, e))"
+                                       @oninput="@(e => PreviewOpacity(layer, e))"
+                                       aria-label="Layer Opacity" />
+                                <span style="width: 32px; text-align: right; font-family: var(--font-mono); font-size: 10px;">@((int)(layer.Opacity * 100))%</span>
+                            </div>
+
+                            <div class="layer-slider-row">
+                                <span style="width: 65px;">Stroke W:</span>
+                                <input type="range" min="0.5" max="8" step="0.5" value="@layer.Style.StrokeWidth"
+                                       @onchange="@(e => SetStrokeWidth(layer, e))"
+                                       aria-label="Stroke Width" />
+                                <span style="width: 32px; text-align: right; font-family: var(--font-mono); font-size: 10px;">@layer.Style.StrokeWidth px</span>
+                            </div>
+
+                            <div class="layer-slider-row">
+                                <span style="width: 65px;">Point:</span>
+                                <input type="range" min="2" max="20" step="1" value="@layer.Style.PointRadius"
+                                       @onchange="@(e => SetPointRadius(layer, e))"
+                                       aria-label="Point Radius" />
+                                <span style="width: 32px; text-align: right; font-family: var(--font-mono); font-size: 10px;">@layer.Style.PointRadius px</span>
+                            </div>
+
+                            <div class="layer-slider-row">
+                                <span style="width: 65px;">Labels:</span>
+                                <select class="form-control" style="flex: 1; padding: 1px 4px; font-size: 10px;"
+                                        value="@(_labelDrafts.TryGetValue(layer.Id, out var lbl) ? lbl : layer.Style.LabelField ?? "")"
+                                        @onchange="@(e => SetLabelField(layer, e))"
+                                        aria-label="Label attribute">
+                                    <option value="">-- None --</option>
+                                    @foreach (var f in SchemaFields(layer))
+                                    {
+                                        <option value="@f">@f</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="layer-slider-row" style="flex-wrap: wrap; gap: var(--space-1);">
+                                <span style="width: 65px;">Classes:</span>
+                                @if (layer.Style.Classification is { } cls)
+                                {
+                                    <span class="layer-meta-badge">@cls.Field (@cls.Breaks.Count)</span>
+                                    <button class="btn btn-icon btn-sm btn-secondary" title="Remove classification"
+                                            @onclick="@(async _ => await State.ClearClassificationAsync(layer))" aria-label="Clear Classification">
+                                        <LucideIcon Name="x" Size="10" />
+                                    </button>
+                                }
+                                else
+                                {
+                                    <select class="form-control" style="flex: 1; padding: 1px 4px; font-size: 10px;"
+                                            value="@_classifyField"
+                                            @onchange="@(e => _classifyField = e.Value?.ToString() ?? "")"
+                                            aria-label="Classification field">
+                                        <option value="">-- Field --</option>
+                                        @foreach (var f in SchemaFields(layer))
+                                        {
+                                            <option value="@f">@f</option>
+                                        }
+                                    </select>
+                                    <select class="form-control" style="width: 92px; padding: 1px 4px; font-size: 10px;"
+                                            value="@_classifyMethod" @onchange="@(e => _classifyMethod = e.Value?.ToString() ?? "equal_interval")"
+                                            aria-label="Classification method">
+                                        <option value="equal_interval">Equal Int.</option>
+                                        <option value="quantile">Quantile</option>
+                                    </select>
+                                    <input type="number" min="2" max="12"
+                                           class="form-control" style="width: 52px; padding: 1px 4px; font-size: 10px;"
+                                           value="@_classifyClasses.ToString()"
+                                           @onchange="@(e => int.TryParse(e.Value?.ToString(), out _classifyClasses))"
+                                           aria-label="Number of classes" />
+                                    <button class="btn btn-secondary btn-sm" style="padding: 1px 8px;" disabled="@string.IsNullOrEmpty(_classifyField)"
+                                            title="Compute categorized symbology on the backend"
+                                            @onclick="@(async _ => await State.ClassifyLayerAsync(layer, _classifyField, _classifyMethod, _classifyClasses))"
+                                            aria-label="Apply Classification">
+                                        <LucideIcon Name="play" Size="10" />
+                                    </button>
+                                }
+                            </div>
+
+                            <div class="layer-buttons-row">
+                                <button class="btn btn-secondary btn-sm" style="flex: 1;" @onclick="() => OpenTable(layer)" aria-label="Open Attribute Table">
+                                    <LucideIcon Name="table" Size="11" />
+                                    <span>Table</span>
+                                </button>
+                                <button class="btn btn-secondary btn-sm" style="flex: 1;" @onclick="() => Export(layer)" aria-label="Export Layer GeoJSON">
+                                    <LucideIcon Name="download" Size="11" />
+                                    <span>Export</span>
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        }
+    </div>
+</aside>
+
+@code {
+    private static readonly (string Shape, string Icon, string Label)[] ShapeOptions =
+    {
+        ("point", "circle", "Point"),
+        ("line", "git-commit", "Line"),
+        ("polygon", "square", "Polygon")
+    };
+
+    /// <summary>Raised so the shell can open the import dialog.</summary>
+    [Parameter] public EventCallback OnAddLayer { get; set; }
+
+    /// <summary>Raised when the user asks to open the attribute table.</summary>
+    [Parameter] public EventCallback<string> OnOpenAttributeTable { get; set; }
+
+    private string? ExpandedLayerId { get; set; }
+    private string _classifyField = "";
+    private string _classifyMethod = "equal_interval";
+    private int _classifyClasses = 5;
+    private readonly Dictionary<string, string> _labelDrafts = new();
+
+    /// <summary>Attribute fields from the layer's dataset schema (label/class candidates).</summary>
+    private List<string> SchemaFields(Layer layer) =>
+        State.GetCachedDataset(layer.DatasetId)?
+            .PropertiesSchema
+            .Select(f => f.Name)
+            .OrderBy(n => n, StringComparer.Ordinal)
+            .ToList() ?? new List<string>();
+
+    [Inject] private IJSRuntime Js { get; set; } = default!;
+
+    protected override void OnInitialized() => State.Changed += OnStateChanged;
+
+    public void Dispose() => State.Changed -= OnStateChanged;
+
+    private void OnStateChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private Task SelectLayer(Layer layer)
+    {
+        if (!string.IsNullOrEmpty(layer.Style.LabelField))
+            _labelDrafts[layer.Id] = layer.Style.LabelField;
+        return State.SelectLayerAsync(layer.Id);
+    }
+
+    private async Task SetLabelField(Layer layer, ChangeEventArgs e)
+    {
+        var field = e.Value?.ToString();
+        _labelDrafts[layer.Id] = field ?? "";
+        await State.SetLabelFieldAsync(layer, field);
+    }
+
+    private void RequestAddLayer()
+    {
+        if (OnAddLayer.HasDelegate)
+            _ = OnAddLayer.InvokeAsync();
+    }
+
+    private void ToggleExpand(string id) =>
+        ExpandedLayerId = ExpandedLayerId == id ? null : id;
+
+    private async Task ToggleVisibility(Layer layer) => await State.ToggleVisibilityAsync(layer);
+
+    private void PreviewOpacity(Layer layer, ChangeEventArgs e)
+    {
+        if (!double.TryParse(e.Value?.ToString(), out var opacity)) return;
+        layer.Opacity = Math.Clamp(opacity, 0, 1);
+        State.Notify(); // repaint map via sync without persisting
+    }
+
+    private Task SetOpacity(Layer layer, ChangeEventArgs e) =>
+        double.TryParse(e.Value?.ToString(), out var o)
+            ? UpdateAndPersist(layer, l => l.Opacity = Math.Clamp(o, 0, 1))
+            : Task.CompletedTask;
+
+    private Task SetFillColor(Layer layer, ChangeEventArgs e) =>
+        UpdateAndPersist(layer, l => l.Style.FillColor = e.Value?.ToString() ?? l.Style.FillColor);
+
+    private Task SetStrokeColor(Layer layer, ChangeEventArgs e) =>
+        UpdateAndPersist(layer, l => l.Style.StrokeColor = e.Value?.ToString() ?? l.Style.StrokeColor);
+
+    private Task SetStrokeWidth(Layer layer, ChangeEventArgs e) =>
+        double.TryParse(e.Value?.ToString(), out var w)
+            ? UpdateAndPersist(layer, l => l.Style.StrokeWidth = w)
+            : Task.CompletedTask;
+
+    private Task SetPointRadius(Layer layer, ChangeEventArgs e) =>
+        double.TryParse(e.Value?.ToString(), out var r)
+            ? UpdateAndPersist(layer, l => l.Style.PointRadius = r)
+            : Task.CompletedTask;
+
+    private Task SetShapeType(Layer layer, string shapeType) =>
+        UpdateAndPersist(layer, l => l.Style.ShapeType = shapeType);
+
+    private async Task UpdateAndPersist(Layer layer, Action<Layer> mutate)
+    {
+        mutate(layer);
+        await State.UpdateStyleAsync(layer);
+    }
+
+    private Task Delete(Layer layer) => State.DeleteLayerAsync(layer.Id);
+
+    private async Task ZoomTo(string layerId) =>
+        await Js.InvokeVoidAsync("geoVizMap.zoomToLayer", layerId);
+
+    private async Task Export(Layer layer)
+    {
+        var detail = await State.ResolveDatasetAsync(layer.DatasetId);
+        if (string.IsNullOrEmpty(detail?.Geojson)) return;
+        var fileName = $"{Sanitize(layer.Name)}.geojson";
+        await Js.InvokeVoidAsync("geoVizMap.downloadFile", fileName, detail.Geojson, "application/geo+json");
+    }
+
+    private async Task OpenTable(Layer layer)
+    {
+        await SelectLayer(layer);
+        if (OnOpenAttributeTable.HasDelegate)
+            await OnOpenAttributeTable.InvokeAsync(layer.Id);
+    }
+
+    private static string Sanitize(string name) =>
+        string.Join('_', name.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
+}

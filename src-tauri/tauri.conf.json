@@ -1,0 +1,40 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "geo-viz",
+  "version": "0.2.0",
+  "identifier": "com.miskat.geo-viz",
+  "build": {
+    "beforeDevCommand": "dotnet watch run --project src/GeoViz.csproj",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "dotnet publish -c Release src/GeoViz.csproj -o dist",
+    "frontendDist": "../dist/wwwroot"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "GeoViz Pro - Spatial Analysis & GIS Studio",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 720,
+        "minHeight": 520,
+        "center": true,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://mt*.google.com https://*.tile.opentopomap.org; connect-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
