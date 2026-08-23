@@ -1,0 +1,57 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    name: Rust engine (fmt · clippy · test)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+      - name: Install system dependencies (tauri build needs webkit headers)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libsoup-3.0-dev patchelf
+      - name: Format check
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      - name: Clippy (deny warnings)
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+      - name: Unit & integration tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  frontend:
+    name: Blazor frontend (build · warnings-as-errors)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Release build (zero warnings)
+        run: dotnet build src/GeoViz.csproj -c Release /warnaserror
+
+  bridges:
+    name: JS bridges (syntax)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax-check bridge scripts
+        run: |
+          node --check src/wwwroot/js/map_bridge.js
+          node --check src/wwwroot/js/motion_bridge.js

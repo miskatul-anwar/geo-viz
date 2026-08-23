@@ -1,0 +1,53 @@
+name: Bug report
+description: Report a problem with GeoViz
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to file a bug! Please never attach private/confidential datasets.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Steps to reproduce, expected vs actual behavior.
+      placeholder: |
+        1. Import ...
+        2. Run '...' tool
+        3. Error appears: ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Map studio / rendering
+        - Import (formats)
+        - Geoprocessing tools
+        - Attribute table
+        - SQL console
+        - Format converter
+        - Packaging / build
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: GeoViz version
+      placeholder: "0.2.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux (deb-based)
+        - Linux (rpm-based)
+        - Linux (AppImage)
+    validations:
+      required: true
