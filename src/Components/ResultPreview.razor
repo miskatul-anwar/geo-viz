@@ -1,0 +1,119 @@
+@using System.Text.Json
+
+<div class="result-preview" aria-label="Result feature attributes">
+    <div class="result-preview-meta">
+        <span>@(Rows.Count == Cap ? $"{Cap}+ rows" : $"{Rows.Count} rows")</span>
+        <span>@Columns.Count fields</span>
+    </div>
+    <div class="table-container result-preview-scroll">
+        @if (Columns.Count == 0)
+        {
+            <p class="result-preview-empty">Result has no attribute payload.</p>
+        }
+        else
+        {
+            <table class="data-table" role="grid" aria-label="Result attributes grid">
+                <thead>
+                    <tr role="row">
+                        <th scope="col" style="width: 34px;" role="columnheader">#</th>
+                        @foreach (var col in Columns)
+                        {
+                            <th scope="col" role="columnheader" title="@col">@col</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in Rows)
+                    {
+                        var rowData = row;
+                        <tr role="row">
+                            <td role="gridcell" class="row-index">@(rowData.Index + 1)</td>
+                            @foreach (var col in Columns)
+                            {
+                                <td role="gridcell" title="@rowData.Get(col)">@(rowData.TryGet(col))</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@code {
+    private const int Cap = 200;
+
+    [Parameter] public string? OutputGeojson { get; set; }
+
+    private List<string> Columns { get; set; } = new();
+    private List<PreviewRow> Rows { get; set; } = new();
+    private string? _lastSource;
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_lastSource, OutputGeojson)) return;
+        _lastSource = OutputGeojson;
+        Columns.Clear();
+        Rows.Clear();
+
+        if (string.IsNullOrWhiteSpace(OutputGeojson)) return;
+        try
+        {
+            using var doc = JsonDocument.Parse(OutputGeojson);
+            if (!doc.RootElement.TryGetProperty("features", out var features) ||
+                features.ValueKind != JsonValueKind.Array)
+                return;
+
+            var columns = new LinkedHashSet<string>();
+            var index = 0;
+            foreach (var feature in features.EnumerateArray())
+            {
+                if (index >= Cap) break;
+                var cells = new Dictionary<string, JsonElement>();
+
+                if (feature.ValueKind == JsonValueKind.Object &&
+                    feature.TryGetProperty("properties", out var props) &&
+                    props.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var p in props.EnumerateObject())
+                    {
+                        columns.Add(p.Name);
+                        cells[p.Name] = p.Value.Clone();
+                    }
+                }
+                Rows.Add(new PreviewRow(index++, cells));
+            }
+
+            Columns = columns.ToList();
+        }
+        catch
+        {
+            // Malformed output: leave the preview empty rather than crashing the view.
+            Columns.Clear();
+            Rows.Clear();
+        }
+    }
+
+    /// <summary>Insertion-ordered set so column order follows feature order.</summary>
+    private sealed class LinkedHashSet<T> : IEnumerable<T>
+    {
+        private readonly List<T> _order = new();
+        private readonly HashSet<T> _set = new();
+
+        public void Add(T item)
+        {
+            if (_set.Add(item)) _order.Add(item);
+        }
+
+        public IEnumerator<T> GetEnumerator() => _order.GetEnumerator();
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    private sealed record PreviewRow(int Index, IReadOnlyDictionary<string, JsonElement> Cells)
+    {
+        public string Get(string column) =>
+            Cells.TryGetValue(column, out var v) ? MetricsSummary.Format(v) : "";
+
+        public string TryGet(string column) => Get(column);
+    }
+}

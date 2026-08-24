@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-24
+
+First stable release. The IPC surface, persistence schema and tool catalogue are considered dependable for daily use.
+
+### Added
+- **Layer Matrix view** — a new top-level workspace listing every layer with format, feature count, geometry types and extent; one-click *Operate* (queues the layer into the calculator) or *Map* (select + jump).
+- **Layer-driven analytics**: every calculator input selector now lists the layers you actually added (with feature counts), polygon-only selectors filter appropriately, and the active map layer is preselected automatically.
+- **Actionable results**: tool summaries now render as a dynamic metric grid straight from the backend payload (areas, counts, densities — humanized), plus a scrollable result attribute preview (up to 200 rows) so outputs are inspectable without leaving the view.
+- **Add to Map** now zooms to the result layer and switches to Map Studio, closing the analysis loop.
+- Cross-view intent queue (`QueueCalculationFor`) decouples matrix/calculator/map navigation through `AppState`.
+
+### Fixed
+- **Satellite basemap**: Google tile scraping was dead (HTTP failures); replaced with Esri World Imagery and allow-listed in the CSP.
+
+### Changed
+- UI density pass: larger, more tactile buttons across toolbars/tabs/icon actions while tightening chrome spacing; functional-density styling for matrix and result views.
+
 ## [0.2.1] - 2026-08-24
 
 ### Fixed

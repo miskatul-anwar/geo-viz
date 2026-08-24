@@ -37,6 +37,23 @@ public sealed class AppState
     /// <summary>Last operation error, surfaced once by the UI then dismissed.</summary>
     public string? Error { get; private set; }
 
+    /// <summary>Dataset queued by another view (e.g. Layer Matrix) to preselect in the calculator.</summary>
+    public string? PendingCalculationDatasetId { get; private set; }
+
+    public void QueueCalculationFor(string datasetId)
+    {
+        PendingCalculationDatasetId = datasetId;
+        Notify();
+    }
+
+    /// <summary>Acknowledges and clears a queued calculation target (no re-render).</summary>
+    public string? ConsumePendingCalculation()
+    {
+        var pending = PendingCalculationDatasetId;
+        PendingCalculationDatasetId = null;
+        return pending;
+    }
+
     public Layer? ActiveLayer => _layers.FirstOrDefault(l => l.Id == ActiveLayerId);
 
     /// <summary>Cached detail (incl. GeoJSON) of the active layer's dataset.</summary>
@@ -341,14 +358,15 @@ public sealed class AppState
     }
 
     /// <summary>Persists the last analysis output as a new map layer.</summary>
-    public async Task AddResultAsLayerAsync()
+    public async Task<Layer?> AddResultAsLayerAsync()
     {
-        if (LastResult is not { } result) return;
+        if (LastResult is not { } result) return null;
         var layer = await _tauri.AddResultLayerAsync(result);
         _layers.Add(layer);
         ActiveLayerId = layer.Id;
         await RefreshStatsInternalAsync();
         Notify();
+        return layer;
     }
 
     // ------------------------------------------------------------------

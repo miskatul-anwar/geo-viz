@@ -1,0 +1,67 @@
+@using System.Text.Json
+
+<div class="metrics-grid" aria-label="Analysis summary metrics">
+    @foreach (var (key, value) in Rows)
+    {
+        <div class="metric-card">
+            <span class="metric-label" title="@key">@Humanize(key)</span>
+            <span class="metric-value" title="@value">@value</span>
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>Backend-produced summary payload for the last analysis run.</summary>
+    [Parameter] public JsonElement Summary { get; set; }
+
+    private List<KeyValuePair<string, string>> Rows { get; set; } = new();
+    private JsonElement _lastRendered;
+
+    protected override void OnParametersSet()
+    {
+        if (_lastRendered.ValueKind == JsonValueKind.Object &&
+            Summary.ValueKind == JsonValueKind.Object &&
+            JsonSerializer.Serialize(_lastRendered) == JsonSerializer.Serialize(Summary))
+        {
+            return; // identical payload; skip rebuild
+        }
+        _lastRendered = Summary;
+        Rows = Summarize(Summary);
+    }
+
+    internal static List<KeyValuePair<string, string>> Summarize(JsonElement summary)
+    {
+        var rows = new List<KeyValuePair<string, string>>();
+        if (summary.ValueKind != JsonValueKind.Object) return rows;
+
+        foreach (var prop in summary.EnumerateObject())
+        {
+            rows.Add(new KeyValuePair<string, string>(prop.Name, Format(prop.Value)));
+        }
+        return rows;
+    }
+
+    internal static string Format(JsonElement v) => v.ValueKind switch
+    {
+        JsonValueKind.Number => v.GetDouble() switch
+        {
+            var n when n >= 1_000_000_000 => $"{n / 1_000_000_000:0.##}B",
+            var n when n >= 1_000_000 => $"{n / 1_000_000:0.##}M",
+            var n when n >= 10_000 => $"{n / 1_000:0.#}k",
+            var n => Math.Abs(n % 1) > double.Epsilon ? n.ToString("0.####") : n.ToString("N0")
+        },
+        JsonValueKind.String => v.GetString() ?? "",
+        JsonValueKind.True => "yes",
+        JsonValueKind.False => "no",
+        JsonValueKind.Null => "—",
+        JsonValueKind.Array => $"[{v.GetArrayLength()}]",
+        _ => "…"
+    };
+
+    internal static string Humanize(string key)
+    {
+        var words = key.Split('_', StringSplitOptions.RemoveEmptyEntries);
+        return string.Join(' ', words.Select(w =>
+            w.Length <= 3 ? w.ToUpperInvariant() : char.ToUpperInvariant(w[0]) + w[1..].ToLowerInvariant()));
+    }
+}

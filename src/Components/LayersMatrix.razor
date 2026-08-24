@@ -1,0 +1,160 @@
+@inject AppState State
+@implements IDisposable
+
+<main class="matrix-view" aria-label="Layer Matrix">
+    <header class="config-header matrix-header">
+        <h2>
+            <LucideIcon Name="table" Size="18" Color="var(--accent)" />
+            <span>Layer Matrix</span>
+        </h2>
+        <p>Every layer in this project at a glance. Run a geoprocessing tool on any row, or jump to it on the map.</p>
+    </header>
+
+    @if (State.Layers.Count == 0)
+    {
+        <div class="matrix-empty">
+            <LucideIcon Name="layers" Size="32" Color="var(--text-muted)" />
+            <h3>No layers yet</h3>
+            <p>Import data in Map Studio; every layer you add appears here with its stats and quick actions.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-container matrix-scroll">
+            <table class="data-table matrix-table" role="grid" aria-label="All layers matrix">
+                <thead>
+                    <tr role="row">
+                        <th scope="col" role="columnheader">Layer</th>
+                        <th scope="col" role="columnheader">Format</th>
+                        <th scope="col" role="columnheader">Features</th>
+                        <th scope="col" role="columnheader">Geometry</th>
+                        <th scope="col" role="columnheader">Extent (lng, lat)</th>
+                        <th scope="col" role="columnheader">Added</th>
+                        <th scope="col" style="text-align: right;" role="columnheader">Operations</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in Rows)
+                    {
+                        var datasetId = entry.DatasetId;
+                        <tr role="row" class="@(State.ActiveLayerId == entry.LayerId ? "selected" : "")">
+                            <td role="gridcell">
+                                <span class="layer-color-dot" style="background-color: @entry.FillColor; border: 1px solid @entry.StrokeColor;"></span>
+                                <strong>@entry.Name</strong>
+                                @if (entry.Visible is false)
+                                {
+                                    <span class="layer-meta-badge">hidden</span>
+                                }
+                            </td>
+                            <td role="gridcell">@entry.Format</td>
+                            <td role="gridcell" class="num">@entry.Features</td>
+                            <td role="gridcell" class="mono">@entry.Geometry</td>
+                            <td role="gridcell" class="mono small">@entry.Extent</td>
+                            <td role="gridcell" class="small">@entry.Created</td>
+                            <td role="gridcell" style="text-align: right; white-space: nowrap;">
+                                <button class="btn btn-secondary btn-sm" title="Select and show on map"
+                                        @onclick="@(() => ShowOnMap(datasetId))">
+                                    <LucideIcon Name="map" Size="11" /> Map
+                                </button>
+                                <button class="btn btn-secondary btn-sm" title="Run a geoprocessing tool on this layer"
+                                        @onclick="@(() => RunTool(datasetId))">
+                                    <LucideIcon Name="zap" Size="11" /> Operate
+                                </button>
+                                <button class="btn btn-icon btn-sm btn-danger" title="Remove layer"
+                                        @onclick="@(() => Delete(entry.LayerId))" aria-label="Delete layer">
+                                    <LucideIcon Name="trash-2" Size="11" />
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <footer class="matrix-footer">
+            <span>@State.Layers.Count layers · @State.Datasets.Count datasets</span>
+            @if (State.Stats is { } stats)
+            {
+                <span>project database @(stats.DbSizeBytes / 1024) KB</span>
+            }
+        </footer>
+    }
+</main>
+
+@code {
+    [Parameter] public EventCallback OnShowOnMap { get; set; }
+    [Parameter] public EventCallback OnOperateRequested { get; set; }
+
+    private List<MatrixRow> Rows { get; set; } = new();
+    private IReadOnlyList<Layer>? _lastLayers;
+    private int _lastDatasetCount = -1;
+
+    protected override void OnInitialized() => State.Changed += OnStateChanged;
+
+    public void Dispose() => State.Changed -= OnStateChanged;
+
+    private void OnStateChanged()
+    {
+        if (!ReferenceEquals(_lastLayers, State.Layers) || _lastDatasetCount != State.Datasets.Count)
+        {
+            Rebuild();
+        }
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void Rebuild()
+    {
+        _lastLayers = State.Layers;
+        _lastDatasetCount = State.Datasets.Count;
+
+        Rows = Enumerable.Reverse(State.Layers)
+            .Select(layer =>
+            {
+                var ds = State.GetCachedDataset(layer.DatasetId);
+                return new MatrixRow(
+                    layer.Id,
+                    layer.DatasetId,
+                    layer.Name,
+                    layer.Style.FillColor,
+                    layer.Style.StrokeColor,
+                    layer.IsVisible,
+                    ds?.Format ?? "?",
+                    ds?.FeatureCount.ToString() ?? "—",
+                    ds is null ? "—" : string.Join(' ', ds.GeomTypes),
+                    FormatExtent(ds?.Bbox),
+                    ShortDate(ds?.CreatedAt));
+            })
+            .ToList();
+    }
+
+    private static string FormatExtent(double[]? bbox) => bbox switch
+    {
+        null => "—",
+        var b => $"{b[0]:0.00},{b[1]:0.00} → {b[2]:0.00},{b[3]:0.00}"
+    };
+
+    private static string ShortDate(string? iso) =>
+        DateTime.TryParse(iso, out var d) ? d.ToLocalTime().ToString("MMM d, HH:mm") : "—";
+
+    private async Task ShowOnMap(string datasetId)
+    {
+        var layer = State.Layers.FirstOrDefault(l => l.DatasetId == datasetId);
+        if (layer is null) return;
+        await State.SelectLayerAsync(layer.Id);
+        if (OnShowOnMap.HasDelegate)
+            await OnShowOnMap.InvokeAsync();
+    }
+
+    private void RunTool(string datasetId)
+    {
+        State.QueueCalculationFor(datasetId);
+        if (OnOperateRequested.HasDelegate)
+            _ = OnOperateRequested.InvokeAsync();
+    }
+
+    private Task Delete(string layerId) => State.DeleteLayerAsync(layerId);
+
+    private sealed record MatrixRow(
+        string LayerId, string DatasetId, string Name, string FillColor, string StrokeColor,
+        bool Visible, string Format, string Features, string Geometry, string Extent, string Created);
+}

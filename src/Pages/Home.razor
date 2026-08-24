@@ -50,7 +50,11 @@
                 <MapStudioView />
                 break;
             case AppView.Calculations:
-                <CalculationWorkspace />
+                <CalculationWorkspace OnGoToMap="(() => SetView(AppView.MapStudio))" />
+                break;
+            case AppView.Matrix:
+                <LayersMatrix OnShowOnMap="(() => SetView(AppView.MapStudio))"
+                              OnOperateRequested="(() => SetView(AppView.Calculations))" />
                 break;
             case AppView.Database:
                 <DatabaseManager />
@@ -63,12 +67,13 @@
 </div>
 
 @code {
-    private enum AppView { MapStudio, Calculations, Database, Converter }
+    private enum AppView { MapStudio, Calculations, Matrix, Database, Converter }
 
     private static readonly (AppView View, string Icon, string Label)[] Views =
     {
         (AppView.MapStudio, "map", "Map Studio"),
         (AppView.Calculations, "zap", "Spatial Calculations"),
+        (AppView.Matrix, "table", "Layer Matrix"),
         (AppView.Database, "database", "SQL & Database"),
         (AppView.Converter, "refresh-cw", "Format Converter")
     };

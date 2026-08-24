@@ -71,17 +71,17 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="primary-dataset-select">Primary Input Layer / Dataset:</label>
+                    <label for="primary-dataset-select">Input Layer:</label>
                     <select id="primary-dataset-select" class="form-control" @bind="_datasetId">
-                        <option value="">-- Select Input Layer --</option>
-                        @foreach (var ds in State.Datasets)
+                        <option value="">-- Select a Layer --</option>
+                        @foreach (var choice in LayerChoices)
                         {
-                            <option value="@ds.Id">@ds.Name (@ds.FeatureCount features)</option>
+                            <option value="@choice.DatasetId">@choice.Label</option>
                         }
                     </select>
-                    @if (State.Datasets.Count == 0)
+                    @if (LayerChoices.Count == 0)
                     {
-                        <span class="form-hint">Import a dataset in Map Studio first.</span>
+                        <span class="form-hint">Add layers in Map Studio first — tools run on the layers you have added.</span>
                     }
                 </div>
 
@@ -126,9 +126,9 @@
                         <label for="polygon-mask-select">Polygon Boundary Mask Dataset (Optional):</label>
                         <select id="polygon-mask-select" class="form-control" @bind="_maskDatasetId">
                             <option value="">-- None (Filter Attributes Only) --</option>
-                            @foreach (var ds in State.Datasets)
+                            @foreach (var choice in PolygonChoices)
                             {
-                                <option value="@ds.Id">@ds.Name</option>
+                                <option value="@choice.DatasetId">@choice.Label</option>
                             }
                         </select>
                     </div>
@@ -177,9 +177,9 @@
                         <label for="overlay-boundary-select">Boundary / Overlay Dataset (B):</label>
                         <select id="overlay-boundary-select" class="form-control" @bind="_overlayDatasetId">
                             <option value="">-- Select Boundary Layer --</option>
-                            @foreach (var ds in State.Datasets)
+                            @foreach (var choice in PolygonChoices)
                             {
-                                <option value="@ds.Id">@ds.Name</option>
+                                <option value="@choice.DatasetId">@choice.Label</option>
                             }
                         </select>
                         @if (State.Datasets.Count == 0)
@@ -202,9 +202,9 @@
                         <label for="join-target-select">Polygon Target Dataset:</label>
                         <select id="join-target-select" class="form-control" @bind="_overlayDatasetId">
                             <option value="">-- Select Target Layer --</option>
-                            @foreach (var ds in State.Datasets)
+                            @foreach (var choice in PolygonChoices)
                             {
-                                <option value="@ds.Id">@ds.Name</option>
+                                <option value="@choice.DatasetId">@choice.Label</option>
                             }
                         </select>
                     </div>
@@ -248,36 +248,42 @@
             {
                 <div class="metrics-grid">
                     <div class="metric-card">
-                        <span class="metric-label">Status</span>
-                        <span class="metric-value" style="color: var(--color-success); font-size: 12px;">SUCCESS</span>
-                    </div>
-                    <div class="metric-card">
-                        <span class="metric-label">Execution</span>
-                        <span class="metric-value">@(result.ExecutionTimeMs)ms</span>
-                    </div>
-                    <div class="metric-card">
-                        <span class="metric-label">Output Features</span>
+                        <span class="metric-label">Output features</span>
                         <span class="metric-value">@result.FeatureCount</span>
                     </div>
                     <div class="metric-card">
-                        <span class="metric-label">CRS</span>
-                        <span class="metric-value" style="font-size: 11px;">EPSG:4326</span>
+                        <span class="metric-label">Runtime</span>
+                        <span class="metric-value">@(result.ExecutionTimeMs) ms</span>
                     </div>
                 </div>
 
+                <MetricsSummary Summary="@result.SummaryMetrics" />
+
+                <ResultPreview OutputGeojson="@result.OutputGeojson" />
+
                 <div style="display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-2);">
-                    <button class="btn btn-primary btn-sm" @onclick="AddToMap" disabled="@_isAdding" aria-label="Add Result to Map Layer">
-                        <LucideIcon Name="map" Size="12" Color="#ffffff" />
-                        <span>Add to Map Canvas</span>
+                    <button class="btn btn-primary btn-sm" @onclick="AddToMap" disabled="@(_isAdding || _justAdded)" aria-label="Add Result to Map Layer">
+                        @if (_justAdded)
+                        {
+                            <LucideIcon Name="layers" Size="12" Color="#ffffff" />
+                            <span>Added to Map ✓</span>
+                        }
+                        else
+                        {
+                            <LucideIcon Name="map" Size="12" Color="#ffffff" />
+                            <span>Add to Map Canvas</span>
+                        }
                     </button>
-                    <button class="btn btn-secondary btn-sm" @onclick="DownloadResult" aria-label="Download Result GeoJSON">
-                        <LucideIcon Name="download" Size="12" />
-                        <span>Download GeoJSON</span>
-                    </button>
-                    <button class="btn btn-secondary btn-sm" @onclick="CopyResult" aria-label="Copy Result GeoJSON">
-                        <LucideIcon Name="copy" Size="12" />
-                        <span>Copy to Clipboard</span>
-                    </button>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-1);">
+                        <button class="btn btn-secondary btn-sm" @onclick="DownloadResult" aria-label="Download Result GeoJSON">
+                            <LucideIcon Name="download" Size="12" />
+                            <span>.geojson</span>
+                        </button>
+                        <button class="btn btn-secondary btn-sm" @onclick="CopyResult" aria-label="Copy Result GeoJSON">
+                            <LucideIcon Name="copy" Size="12" />
+                            <span>Copy</span>
+                        </button>
+                    </div>
                 </div>
             }
             else
@@ -295,6 +301,9 @@
 </main>
 
 @code {
+    /// <summary>Raised after a result layer lands on the map, so the shell can switch views.</summary>
+    [Parameter] public EventCallback OnGoToMap { get; set; }
+
     private string _datasetId = string.Empty;
     private string _maskDatasetId = string.Empty;
     private string _overlayDatasetId = string.Empty;
@@ -311,24 +320,72 @@
 
     private bool _isRunning;
     private bool _isAdding;
+    private bool _justAdded;
     private string? _runError;
 
     protected override void OnInitialized()
     {
         State.Changed += OnStateChanged;
-        // Keep the dataset selector usable as datasets come and go.
-        if (State.Datasets.Count > 0 && string.IsNullOrEmpty(_datasetId))
-            _datasetId = State.Datasets[0].Id;
+        ConsumeQueuedTarget();
+        EnsureSelection();
     }
 
     public void Dispose() => State.Changed -= OnStateChanged;
 
     private void OnStateChanged()
     {
-        if (State.Datasets.Count > 0 && string.IsNullOrEmpty(_datasetId))
-            _datasetId = State.Datasets[0].Id;
+        ConsumeQueuedTarget();
+        EnsureSelection();
+        if (State.LastResult != null && !ReferenceEquals(State.LastResult, _lastResult))
+        {
+            _lastResult = State.LastResult;
+            _justAdded = false;
+        }
         _ = InvokeAsync(StateHasChanged);
     }
+
+    /// <summary>Layer choices for every input selector: what the user sees on the map.</summary>
+    private sealed record LayerChoice(string DatasetId, string Label, bool IsPolygon);
+
+    private List<LayerChoice> LayerChoices =>
+        Enumerable.Reverse(State.Layers)
+            .Select(l => ToChoice(l))
+            .Where(c => c is not null)
+            .Select(c => c!)
+            .ToList();
+
+    private List<LayerChoice> PolygonChoices => LayerChoices.Where(c => c.IsPolygon).ToList();
+
+    private LayerChoice? ToChoice(Layer l)
+    {
+        var ds = State.GetCachedDataset(l.DatasetId);
+        if (ds is null) return null;
+        var isPolygon = ds.GeomTypes.Any(t => t is "Polygon" or "MultiPolygon");
+        return new LayerChoice(ds.Id, $"{l.Name} · {ds.FeatureCount:N0} feats", isPolygon);
+    }
+
+    private void ConsumeQueuedTarget()
+    {
+        if (State.ConsumePendingCalculation() is { } queued)
+        {
+            if (LayerChoices.Any(c => c.DatasetId == queued))
+                _datasetId = queued;
+        }
+    }
+
+    /// <summary>Default to the active map layer; keep selection valid as layers change.</summary>
+    private void EnsureSelection()
+    {
+        var valid = LayerChoices.Any(c => c.DatasetId == _datasetId);
+        if (valid) return;
+
+        _datasetId =
+            (State.ActiveLayer is { } active ? LayerChoices.FirstOrDefault(c => c.DatasetId == active.DatasetId)?.DatasetId : null)
+            ?? LayerChoices.FirstOrDefault()?.DatasetId
+            ?? string.Empty;
+    }
+
+    private SpatialAnalysisResult? _lastResult;
 
     private async Task CloseTab(string id) => await State.CloseTabAsync(id);
 
@@ -398,11 +455,18 @@
 
     private async Task AddToMap()
     {
-        if (_isAdding) return;
+        if (_isAdding || _justAdded) return;
         _isAdding = true;
         try
         {
-            await State.AddResultAsLayerAsync();
+            var layer = await State.AddResultAsLayerAsync();
+            if (layer is not null)
+            {
+                _justAdded = true;
+                await JsRuntime.InvokeVoidAsync("geoVizMap.zoomToLayer", layer.Id);
+                if (OnGoToMap.HasDelegate)
+                    await OnGoToMap.InvokeAsync();
+            }
         }
         catch (Exception ex)
         {
