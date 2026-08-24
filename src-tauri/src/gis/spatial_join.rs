@@ -106,6 +106,7 @@ pub fn run_spatial_join(
     let summary = serde_json::json!({
         "source_features": source_fc.features.len(),
         "joined_features": joined_count,
+        "unmatched_features": source_fc.features.len() - joined_count,
         "joined_fields": joined_fields,
     });
     Ok((

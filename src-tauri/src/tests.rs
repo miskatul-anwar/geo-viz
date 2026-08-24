@@ -512,6 +512,15 @@ mod tests {
         assert_eq!(result.feature_count, 2);
         assert!(result.execution_time_ms >= 0);
         assert!(result.output_geojson.contains("Polygon"));
+        // Actionable summary: buffer must report the footprint it created.
+        assert!(result
+            .summary_metrics
+            .get("total_buffered_area_sqkm")
+            .is_some());
+
+        let history = db.list_calculations(10).await.expect("history failed");
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].tool_name, "buffer");
 
         let stats = db.get_stats().await.expect("stats failed");
         assert_eq!(stats.calculation_count, 1, "history entry must be logged");

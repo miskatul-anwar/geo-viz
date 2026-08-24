@@ -1,0 +1,108 @@
+/* GeoViz — layout: app shell, header, navigation */
+/* Top App Layout */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background-color: var(--bg-app);
+}
+
+/* Header */
+.app-header {
+  height: var(--header-height);
+  min-height: var(--header-height);
+  max-height: var(--header-height);
+  gap: var(--space-2);
+  flex-shrink: 0;
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-4);
+  user-select: none;
+  z-index: 1000;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.brand-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--text-primary);
+}
+
+.brand-badge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background-color: var(--accent-subtle);
+  color: var(--accent);
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+/* Navigation Tabs */
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  background-color: var(--bg-app);
+  padding: 2px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+}
+
+.nav-tab-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  transition: color 0.1s, background-color 0.1s;
+}
+
+.nav-tab-btn:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-surface-raised);
+}
+
+.nav-tab-btn.active {
+  background-color: var(--bg-surface-raised);
+  color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Content Viewport (Constrained) */
+.app-content {
+  flex: 1 1 0%;
+  min-height: 0;
+  height: 0;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+

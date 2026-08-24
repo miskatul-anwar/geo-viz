@@ -57,19 +57,19 @@ pub fn run_overlay(
         out.push(feature_with_multipolygon(&result, props));
     }
 
+    let out_fc = FeatureCollection {
+        bbox: None,
+        features: out,
+        foreign_members: None,
+    };
+    let output_area_sqkm = crate::gis::metrics::collection_spherical_area_sqkm(&out_fc);
     let summary = serde_json::json!({
         "operation": operation,
         "input_features": fc.features.len(),
-        "output_features": out.len(),
+        "output_features": out_fc.features.len(),
+        "output_area_sqkm": output_area_sqkm
     });
-    Ok((
-        FeatureCollection {
-            bbox: None,
-            features: out,
-            foreign_members: None,
-        },
-        summary,
-    ))
+    Ok((out_fc, summary))
 }
 
 /// Clip: keep the parts of the source inside the (multi)polygon mask,
@@ -113,19 +113,19 @@ pub fn run_clip(
         }
     }
 
+    let out_fc = FeatureCollection {
+        bbox: None,
+        features: out,
+        foreign_members: None,
+    };
+    let clipped_area_sqkm = crate::gis::metrics::collection_spherical_area_sqkm(&out_fc);
     let summary = serde_json::json!({
         "operation": "clip",
         "input_features": fc.features.len(),
-        "clipped_features": out.len(),
+        "clipped_features": out_fc.features.len(),
+        "clipped_area_sqkm": clipped_area_sqkm
     });
-    Ok((
-        FeatureCollection {
-            bbox: None,
-            features: out,
-            foreign_members: None,
-        },
-        summary,
-    ))
+    Ok((out_fc, summary))
 }
 
 /// Union/Dissolve: merge all polygons into their minimal coverage. When a
@@ -183,19 +183,27 @@ pub fn run_dissolve(
         return Err("no polygon geometry available to dissolve".into());
     }
 
+    let out_fc = FeatureCollection {
+        bbox: None,
+        features: out,
+        foreign_members: None,
+    };
+    let merged_area_sqkm = crate::gis::metrics::collection_spherical_area_sqkm(&out_fc);
+    let reduction_percent = if fc.features.is_empty() {
+        0.0
+    } else {
+        ((fc.features.len() - out_fc.features.len()) as f64 / fc.features.len() as f64 * 1000.0)
+            .round()
+            / 10.0
+    };
     let summary = serde_json::json!({
         "group_field": group_field,
         "input_features": fc.features.len(),
-        "output_groups": out.len(),
+        "output_groups": out_fc.features.len(),
+        "feature_reduction_percent": reduction_percent,
+        "merged_area_sqkm": merged_area_sqkm
     });
-    Ok((
-        FeatureCollection {
-            bbox: None,
-            features: out,
-            foreign_members: None,
-        },
-        summary,
-    ))
+    Ok((out_fc, summary))
 }
 
 // ---------------------------------------------------------------------------

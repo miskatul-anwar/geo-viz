@@ -32,13 +32,42 @@
     internal static List<KeyValuePair<string, string>> Summarize(JsonElement summary)
     {
         var rows = new List<KeyValuePair<string, string>>();
-        if (summary.ValueKind != JsonValueKind.Object) return rows;
-
-        foreach (var prop in summary.EnumerateObject())
-        {
-            rows.Add(new KeyValuePair<string, string>(prop.Name, Format(prop.Value)));
-        }
+        Flatten(summary, null, rows, 0);
         return rows;
+    }
+
+    /// <summary>
+    /// Walks the payload depth-first; nested objects become prefixed rows
+    /// (attribute_statistics.population.mean → "Population Mean") and scalar
+    /// arrays are listed inline, so no backend metric is invisible.
+    /// </summary>
+    private static void Flatten(JsonElement element, string? prefix, List<KeyValuePair<string, string>> rows, int depth)
+    {
+        if (depth > 3 || rows.Count > 60) return;
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                foreach (var prop in element.EnumerateObject())
+                    Flatten(prop.Value, JoinLabel(prefix, prop.Name), rows, depth + 1);
+                break;
+            case JsonValueKind.Array when element.GetArrayLength() == 0:
+                rows.Add(new KeyValuePair<string, string>(prefix ?? "items", "none"));
+                break;
+            case JsonValueKind.Array:
+                rows.Add(new KeyValuePair<string, string>(
+                    prefix ?? "items",
+                    string.Join(", ", element.EnumerateArray().Take(6).Select(v => Format(v)))));
+                break;
+            default:
+                rows.Add(new KeyValuePair<string, string>(prefix ?? "value", Format(element)));
+                break;
+        }
+    }
+
+    private static string JoinLabel(string? prefix, string name)
+    {
+        var label = Humanize(name);
+        return string.IsNullOrEmpty(prefix) ? label : $"{prefix} {label}";
     }
 
     internal static string Format(JsonElement v) => v.ValueKind switch

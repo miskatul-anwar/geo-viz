@@ -382,9 +382,37 @@ impl AppDb {
         .bind(&bookmark.created_at)
         .execute(&*self.pool)
         .await?;
+
         Ok(())
     }
 
+    /// Most recent calculation runs (newest first), for the analysis UI.
+    pub async fn list_calculations(&self, limit: i64) -> AppResult<Vec<CalculationHistory>> {
+        let rows = sqlx::query(
+            r#"
+            SELECT id, tab_id, tool_name, parameters_json, result_summary_json, execution_time_ms, created_at
+            FROM calculations
+            ORDER BY created_at DESC
+            LIMIT ?
+            "#,
+        )
+        .bind(limit.clamp(1, 100))
+        .fetch_all(&*self.pool)
+        .await?;
+
+        Ok(rows
+            .iter()
+            .map(|r| CalculationHistory {
+                id: r.get("id"),
+                tab_id: r.get("tab_id"),
+                tool_name: r.get("tool_name"),
+                parameters_json: r.get("parameters_json"),
+                result_summary_json: r.get("result_summary_json"),
+                execution_time_ms: r.get("execution_time_ms"),
+                created_at: r.get("created_at"),
+            })
+            .collect())
+    }
     pub async fn list_bookmarks(&self) -> AppResult<Vec<MapBookmark>> {
         let rows = sqlx::query("SELECT id, name, center_lat, center_lng, zoom, created_at FROM bookmarks ORDER BY created_at DESC")
             .fetch_all(&*self.pool)

@@ -7,27 +7,27 @@
 
     <nav class="map-floating-toolbar" role="toolbar" aria-label="Map Analysis Tools">
         <button class="btn btn-secondary btn-sm" @onclick="FitAllLayers" title="Zoom to fit all data extents" aria-label="Zoom to Full Extent">
-            <LucideIcon Name="maximize" Size="13" />
+            <LucideIcon Name="maximize" Size="15" />
             <span>Full Extent</span>
         </button>
         <button class="btn btn-secondary btn-sm @(_measureMode == "distance" ? "active" : "")" @onclick='() => SetMeasureMode("distance")' title="Measure polyline distance on map" aria-label="Measure Distance">
-            <LucideIcon Name="ruler" Size="13" />
+            <LucideIcon Name="ruler" Size="15" />
             <span>Distance</span>
         </button>
         <button class="btn btn-secondary btn-sm @(_measureMode == "area" ? "active" : "")" @onclick='() => SetMeasureMode("area")' title="Measure polygon area on map" aria-label="Measure Area">
-            <LucideIcon Name="compass" Size="13" />
+            <LucideIcon Name="compass" Size="15" />
             <span>Area</span>
         </button>
         <button class="btn btn-secondary btn-sm" @onclick="ClearMeasurements" title="Clear measurement overlays" aria-label="Clear Measurements">
-            <LucideIcon Name="eraser" Size="13" />
+            <LucideIcon Name="eraser" Size="15" />
             <span>Clear</span>
         </button>
         <button class="btn btn-secondary btn-sm @(_showBookmarks ? "active" : "")" @onclick="() => _showBookmarks = !_showBookmarks" title="Spatial Bookmarks" aria-label="Spatial Bookmarks">
-            <LucideIcon Name="folder" Size="13" />
+            <LucideIcon Name="folder" Size="15" />
             <span>Bookmarks</span>
         </button>
         <button class="btn btn-secondary btn-sm @(IsTableOpen ? "active" : "")" @onclick="ToggleTable" title="Toggle Attribute Table Drawer" aria-label="Toggle Attribute Table">
-            <LucideIcon Name="table" Size="13" />
+            <LucideIcon Name="table" Size="15" />
             <span>Attributes</span>
         </button>
     </nav>
@@ -36,32 +36,32 @@
     {
         <aside class="bookmark-panel" aria-label="Saved Map Views">
             <div style="display: flex; gap: var(--space-1); margin-bottom: var(--space-2);">
-                <input class="form-control" style="flex: 1; padding: 2px 6px; font-size: 10px;"
+                <input class="form-control" style="flex: 1; padding: 6px 8px; font-size: 12px;"
                        placeholder="Bookmark name..." @bind="_bookmarkName" aria-label="Bookmark Name" />
-                <button class="btn btn-primary btn-sm" style="padding: 2px 8px;" disabled="@string.IsNullOrWhiteSpace(_bookmarkName)"
+                <button class="btn btn-primary btn-sm" disabled="@string.IsNullOrWhiteSpace(_bookmarkName)"
                         @onclick="SaveCurrentView" title="Save current map view" aria-label="Save Bookmark">
-                    <LucideIcon Name="plus" Size="11" Color="#ffffff" />
+                    <LucideIcon Name="plus" Size="13" Color="#ffffff" />
                 </button>
             </div>
             @if (State.Bookmarks.Count == 0)
             {
-                <p style="font-size: 10px; color: var(--text-muted); text-align: center;">No bookmarks saved yet.</p>
+                <p style="font-size: 11px; color: var(--text-muted); text-align: center;">No bookmarks saved yet.</p>
             }
             else
             {
                 <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px;">
                     @foreach (var bookmark in State.Bookmarks)
                     {
-                        <li style="display: flex; align-items: center; gap: var(--space-1); background-color: var(--bg-surface-raised); border-radius: var(--radius-sm); padding: 2px 6px;">
-                            <button style="flex: 1; text-align: left; font-size: 10.5px; color: var(--text-primary); cursor: pointer;"
+                        <li style="display: flex; align-items: center; gap: var(--space-1); background-color: var(--bg-surface-raised); border-radius: var(--radius-sm); padding: 4px 7px;">
+                            <button style="flex: 1; text-align: left; font-size: 12px; color: var(--text-primary); cursor: pointer;"
                                     @onclick="() => GoToBookmark(bookmark)" title="Jump to @bookmark.Name">
                                 @bookmark.Name
-                                <span style="color: var(--text-muted); font-family: var(--font-mono); font-size: 9px;">
+                                <span style="color: var(--text-muted); font-family: var(--font-mono); font-size: 10.5px;">
                                     (@bookmark.CenterLat.ToString("F2"), @bookmark.CenterLng.ToString("F2"))
                                 </span>
                             </button>
                             <button class="btn btn-icon btn-sm btn-danger" @onclick="@(async _ => await State.DeleteBookmarkAsync(bookmark.Id))" aria-label="Delete Bookmark">
-                                <LucideIcon Name="x" Size="10" />
+                                <LucideIcon Name="x" Size="12" />
                             </button>
                         </li>
                     }

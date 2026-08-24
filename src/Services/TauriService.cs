@@ -102,6 +102,11 @@ public sealed class TauriService
     public Task<DatabaseStats> GetDatabaseStatsAsync() =>
         InvokeAsync<DatabaseStats>("get_database_stats");
 
+    // Calculation history (recent runs feed)
+
+    public Task<List<CalculationRun>> ListCalculationHistoryAsync(int limit = 15) =>
+        InvokeAsync<List<CalculationRun>>("list_calculation_history", new { limit });
+
     // Geoprocessing tools: one generic dispatch point; argument construction
     // and tool selection live in AppState.RunToolAsync.
 

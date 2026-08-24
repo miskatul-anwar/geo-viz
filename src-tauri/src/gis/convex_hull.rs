@@ -91,10 +91,12 @@ pub fn calculate_convex_hull(
         foreign_members: None,
     };
 
+    let enclosed_area_sqkm = crate::gis::metrics::collection_spherical_area_sqkm(&out_fc);
     let summary = serde_json::json!({
         "input_features": fc.features.len(),
         "output_hulls": out_fc.features.len(),
-        "mode": if per_feature { "per_feature" } else { "unified_layer" }
+        "mode": if per_feature { "per_feature" } else { "unified_layer" },
+        "enclosed_area_sqkm": enclosed_area_sqkm
     });
 
     Ok((out_fc, summary))

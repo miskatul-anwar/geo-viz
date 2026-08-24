@@ -129,6 +129,26 @@ pub fn calculate_metrics(
     Ok((out_fc, summary))
 }
 
+/// Total spherical surface area (km²) of every polygon in a collection.
+/// Shared by tools whose summaries report the spatial footprint of outputs.
+pub fn collection_spherical_area_sqkm(fc: &FeatureCollection) -> f64 {
+    let mut total = 0.0;
+    for feature in &fc.features {
+        if let Some(ref geom) = feature.geometry {
+            match &geom.value {
+                GeoValue::Polygon(rings) => total += polygon_spherical_area(rings),
+                GeoValue::MultiPolygon(polys) => {
+                    for rings in polys {
+                        total += polygon_spherical_area(rings);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    (total / 1_000_000.0 * 1000.0).round() / 1000.0
+}
+
 pub fn haversine_distance(p1: &[f64], p2: &[f64]) -> f64 {
     let lat1 = p1[1].to_radians();
     let lat2 = p2[1].to_radians();

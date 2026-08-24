@@ -15,6 +15,7 @@ public sealed class AppState
     private readonly List<DatasetSummary> _datasets = new();
     private readonly List<CalculationTab> _tabs = new();
     private readonly List<MapBookmark> _bookmarks = new();
+    private readonly List<CalculationRun> _recentRuns = new();
 
     public AppState(TauriService tauri)
     {
@@ -28,6 +29,7 @@ public sealed class AppState
     public IReadOnlyList<DatasetSummary> Datasets => _datasets;
     public IReadOnlyList<CalculationTab> Tabs => _tabs;
     public IReadOnlyList<MapBookmark> Bookmarks => _bookmarks;
+    public IReadOnlyList<CalculationRun> RecentRuns => _recentRuns;
 
     public string? ActiveLayerId { get; private set; }
     public string? ActiveTabId { get; private set; }
@@ -111,6 +113,16 @@ public sealed class AppState
         catch
         {
             /* bookmarks are non-critical at startup */
+        }
+
+        try
+        {
+            _recentRuns.Clear();
+            _recentRuns.AddRange(await _tauri.ListCalculationHistoryAsync());
+        }
+        catch
+        {
+            /* history is non-critical at startup */
         }
 
         if (ActiveLayerId is not null && _layers.All(l => l.Id != ActiveLayerId))
@@ -352,6 +364,19 @@ public sealed class AppState
         }
 
         LastResult = result;
+        _recentRuns.Insert(0, new CalculationRun
+        {
+            Id = Guid.NewGuid().ToString(),
+            TabId = ActiveTabId ?? string.Empty,
+            ToolName = toolKey,
+            ParametersJson = System.Text.Json.JsonSerializer.Serialize(parameters),
+            ResultSummaryJson = result.SummaryMetrics.ValueKind == System.Text.Json.JsonValueKind.Object
+                ? result.SummaryMetrics.GetRawText()
+                : "{}",
+            ExecutionTimeMs = result.ExecutionTimeMs,
+            CreatedAt = DateTime.UtcNow.ToString("o")
+        });
+        if (_recentRuns.Count > 20) _recentRuns.RemoveAt(_recentRuns.Count - 1);
         await RefreshStatsInternalAsync();
         ClearError();
         Notify();

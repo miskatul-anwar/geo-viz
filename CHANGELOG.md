@@ -5,6 +5,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-08-24
+
+Major release focused on **UI/UX quality and structural discipline**.
+
+### Added
+- **Fluid, viewport-aware layout**: rem-based spacing tokens, 4K scale-up (wider panels, 18px root type at ≥2000px), slim side rails at ≤1024px, stacked single-column workspaces at ≤860px, and icon-only toolbars at ≤640px — no horizontal scrolling or overlapping chrome from 4K down to the smallest window.
+- **Functional density pass**: reclaimed decorative whitespace across the matrix view, results panel, tool cards and config headers without shrinking controls.
+
+### Changed
+- **Stylesheet decomposition**: the 1,550-line `app.css` monolith is split into seven single-responsibility sheets (`tokens` → `base` → `layout` → `map` → `calculations` → `data` → `responsive`), loaded in strict cascade order so responsive overrides always win.
+- **Larger, tactile controls**: buttons, nav tabs, basemap switcher, bookmark panel and matrix row actions enlarged (13px/12px labels, taller hit areas).
+- **Recent runs feed**: calculation history surfaced via the new `list_calculation_history` IPC command; the telemetry panel lists recent tool runs with duration.
+- **Result provenance**: results now name the tool and input layer that produced them.
+
+### Fixed
+- Metric cards rendered nested payloads as "…"; nested objects/arrays are now flattened into readable rows (e.g. "Population Mean").
+- Actionable summaries across tools: buffer reports total buffered area, hull/bbox report enclosed area, overlay/clip report output area, dissolve reports merged area + feature reduction %, spatial query reports match rate %, spatial join reports unmatched count.
+
+### Verified
+- **Architecture audit**: no IPC outside the typed `TauriService` wrapper; no business logic or persistence in components (backend-heavy/frontend-thin boundary intact); layer sync remains signature-diffed and cache-backed (no over-fetching).
+- Headless-browser walkthrough at 2560/1280/920/620 px: zero page errors, zero horizontal scroll, satellite basemap loads 24/24 tiles under the production CSP.
+
 ## [1.0.0] - 2026-08-24
 
 First stable release. The IPC surface, persistence schema and tool catalogue are considered dependable for daily use.

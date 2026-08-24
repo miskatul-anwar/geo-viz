@@ -69,9 +69,17 @@ pub fn execute_spatial_query(
         foreign_members: None,
     };
 
+    let input_count = source_fc.features.len();
+    let matched_count = out_fc.features.len();
+    let match_rate = if input_count > 0 {
+        (matched_count as f64 / input_count as f64 * 1000.0).round() / 10.0
+    } else {
+        0.0
+    };
     let summary = serde_json::json!({
-        "input_features": source_fc.features.len(),
-        "matched_features": out_fc.features.len(),
+        "input_features": input_count,
+        "matched_features": matched_count,
+        "match_rate_percent": match_rate,
         "spatial_relation": spatial_relation,
         "attribute_condition": format!("{} {} {}", attribute_field.unwrap_or(""), attribute_op.unwrap_or(""), attribute_val.unwrap_or(""))
     });

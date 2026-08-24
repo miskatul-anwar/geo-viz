@@ -329,3 +329,15 @@ pub async fn list_bookmarks(state: State<'_, AppDb>) -> AppResult<Vec<MapBookmar
 pub async fn delete_bookmark(state: State<'_, AppDb>, id: String) -> AppResult<bool> {
     state.delete_bookmark(&id).await
 }
+
+// ---------------------------------------------------------------------------
+// Calculation history
+// ---------------------------------------------------------------------------
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn list_calculation_history(
+    state: State<'_, AppDb>,
+    limit: Option<i64>,
+) -> AppResult<Vec<CalculationHistory>> {
+    state.list_calculations(limit.unwrap_or(15)).await
+}

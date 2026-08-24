@@ -59,6 +59,8 @@ pub fn run() {
             commands::run_overlay_tool,
             commands::run_dissolve_tool,
             commands::run_spatial_join_tool,
+            // Calculation history
+            commands::list_calculation_history,
             // Symbology
             commands::compute_class_breaks,
             // Bookmarks

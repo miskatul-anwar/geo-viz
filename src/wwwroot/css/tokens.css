@@ -1,0 +1,97 @@
+/* GeoViz — design tokens (themes, spacing, geometry) */
+/* ==========================================================================
+   GeoViz Pro - Elite Spatial Computing & GIS Studio Design System
+   High-density, mathematical 4px/8px token grid, eye-friendly calibrated themes
+   Strict viewport constraint containment (0 bottom overflow / 0 truncation)
+   ========================================================================== */
+
+:root {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+
+  /* Spacing Tokens (rem-based: scale with root font-size) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  /* Structural Geometry */
+  --header-height: 44px;
+  --statusbar-height: 24px;
+  --toc-width: 280px;
+  --calc-sidebar-width: 240px;
+  --calc-results-width: 290px;
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* Eye-Friendly Slate-Dimmed Dark Theme (Default) */
+  --bg-app: #14171e;
+  --bg-surface: #1b1f29;
+  --bg-surface-raised: #232836;
+  --bg-surface-hover: #2c3344;
+  --bg-surface-active: #363e52;
+  
+  --border-subtle: #252b3b;
+  --border-main: #323a4f;
+  --border-strong: #45506a;
+  --border-focus: #38bdf8;
+
+  --text-primary: #e6edf3;
+  --text-secondary: #9aa5b8;
+  --text-muted: #6b778c;
+  --text-inverse: #14171e;
+
+  /* Calibrated Soft Accents */
+  --accent: #38bdf8;
+  --accent-hover: #0ea5e9;
+  --accent-active: #0284c7;
+  --accent-subtle: rgba(56, 189, 248, 0.12);
+  --accent-glow: rgba(56, 189, 248, 0.22);
+
+  --color-success: #34d399;
+  --color-success-bg: rgba(52, 211, 153, 0.12);
+  --color-warning: #fbbf24;
+  --color-warning-bg: rgba(251, 191, 36, 0.12);
+  --color-danger: #f87171;
+  --color-danger-bg: rgba(248, 113, 113, 0.12);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.5);
+}
+
+/* Light Mode Override */
+[data-theme="light"] {
+  --bg-app: #f6f8fa;
+  --bg-surface: #ffffff;
+  --bg-surface-raised: #f0f3f6;
+  --bg-surface-hover: #e4e9f0;
+  --bg-surface-active: #d5dde7;
+
+  --border-subtle: #e1e7ee;
+  --border-main: #d0d7de;
+  --border-strong: #9ca3af;
+  --border-focus: #0284c7;
+
+  --text-primary: #1f2937;
+  --text-secondary: #4b5563;
+  --text-muted: #6b7280;
+  --text-inverse: #ffffff;
+
+  --accent: #0284c7;
+  --accent-hover: #0369a1;
+  --accent-active: #075985;
+  --accent-subtle: rgba(2, 132, 199, 0.1);
+  --accent-glow: rgba(2, 132, 199, 0.2);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.12);
+}
+

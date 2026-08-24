@@ -203,6 +203,30 @@ public class SpatialAnalysisResult
     public string LayerName { get; set; } = string.Empty;
 }
 
+public class CalculationRun
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("tab_id")]
+    public string TabId { get; set; } = string.Empty;
+
+    [JsonPropertyName("tool_name")]
+    public string ToolName { get; set; } = string.Empty;
+
+    [JsonPropertyName("parameters_json")]
+    public string ParametersJson { get; set; } = string.Empty;
+
+    [JsonPropertyName("result_summary_json")]
+    public string ResultSummaryJson { get; set; } = string.Empty;
+
+    [JsonPropertyName("execution_time_ms")]
+    public long ExecutionTimeMs { get; set; }
+
+    [JsonPropertyName("created_at")]
+    public string CreatedAt { get; set; } = string.Empty;
+}
+
 public class DatabaseStats
 {
     [JsonPropertyName("dataset_count")]

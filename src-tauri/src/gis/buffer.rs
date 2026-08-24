@@ -106,12 +106,14 @@ pub fn calculate_buffer(
         foreign_members: None,
     };
 
+    let output_area_sqkm = crate::gis::metrics::collection_spherical_area_sqkm(&out_fc);
     let summary = serde_json::json!({
         "input_features": fc.features.len(),
         "buffered_features": out_fc.features.len(),
         "buffer_radius_meters": distance_meters,
         "buffer_radius_km": distance_meters / 1000.0,
-        "segments": steps
+        "segments": steps,
+        "total_buffered_area_sqkm": output_area_sqkm
     });
 
     Ok((out_fc, summary))

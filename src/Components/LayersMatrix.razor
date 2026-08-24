@@ -54,15 +54,15 @@
                             <td role="gridcell" style="text-align: right; white-space: nowrap;">
                                 <button class="btn btn-secondary btn-sm" title="Select and show on map"
                                         @onclick="@(() => ShowOnMap(datasetId))">
-                                    <LucideIcon Name="map" Size="11" /> Map
+                                    <LucideIcon Name="map" Size="14" /> Map
                                 </button>
                                 <button class="btn btn-secondary btn-sm" title="Run a geoprocessing tool on this layer"
                                         @onclick="@(() => RunTool(datasetId))">
-                                    <LucideIcon Name="zap" Size="11" /> Operate
+                                    <LucideIcon Name="zap" Size="14" /> Operate
                                 </button>
                                 <button class="btn btn-icon btn-sm btn-danger" title="Remove layer"
                                         @onclick="@(() => Delete(entry.LayerId))" aria-label="Delete layer">
-                                    <LucideIcon Name="trash-2" Size="11" />
+                                    <LucideIcon Name="trash-2" Size="13" />
                                 </button>
                             </td>
                         </tr>

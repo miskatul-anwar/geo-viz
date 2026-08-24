@@ -1,0 +1,367 @@
+/* GeoViz — calculations: tool selector, config, metrics, matrix */
+/* Multi-Tab Calculation Engine Styles */
+.calc-workspace-container {
+  flex: 1 1 0%;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: var(--bg-app);
+}
+
+.calc-tabs-header-bar {
+  display: flex;
+  align-items: center;
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0 var(--space-3);
+  overflow-x: auto;
+  gap: var(--space-1);
+  height: 36px;
+  min-height: 36px;
+  flex-shrink: 0;
+}
+
+.calc-tab-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  background-color: var(--bg-app);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  border: 1px solid var(--border-subtle);
+  border-bottom: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.1s;
+}
+
+.calc-tab-pill:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-surface-raised);
+}
+
+.calc-tab-pill.active {
+  background-color: var(--bg-surface-raised);
+  color: var(--accent);
+  border-color: var(--border-main);
+  border-top: 2px solid var(--accent);
+}
+
+.tab-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  border-radius: 50%;
+  padding: 1px 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tab-close-btn:hover {
+  color: var(--color-danger);
+}
+
+.calc-add-tab-btn {
+  background: transparent;
+  border: 1px dashed var(--border-main);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.calc-add-tab-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.calc-workspace-body {
+  flex: 1 1 0%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: var(--calc-sidebar-width) 1fr var(--calc-results-width);
+  overflow: hidden;
+  height: 100%;
+}
+
+/* Tool Selector Grid */
+.tool-selector-panel {
+  background-color: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle);
+  overflow-y: auto;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: 0;
+}
+
+.tool-category-title {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin: var(--space-2) 0 var(--space-1) var(--space-1);
+}
+
+.tool-card-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background-color: var(--bg-surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.1s;
+}
+.tool-card-item:hover {
+  background-color: var(--bg-surface-hover);
+  border-color: var(--border-main);
+}
+.tool-card-item.selected {
+  background-color: var(--accent-subtle);
+  border-color: var(--accent);
+}
+
+.tool-item-icon {
+  padding: 2px;
+  background-color: var(--bg-app);
+  border-radius: var(--radius-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tool-item-details h4 {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.tool-item-details p {
+  font-size: 10px;
+  color: var(--text-secondary);
+  line-height: 1.25;
+  margin-top: 1px;
+}
+
+/* Center Parameters Configuration Area */
+.tool-config-panel {
+  padding: var(--space-4);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background-color: var(--bg-app);
+  min-height: 0;
+}
+
+.config-header {
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: var(--space-2);
+}
+.config-header h2 {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.config-header p {
+  color: var(--text-secondary);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.form-group label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+/* Results & Metrics Panel */
+.calc-results-panel {
+  background-color: var(--bg-surface);
+  border-left: 1px solid var(--border-subtle);
+  overflow-y: auto;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+}
+
+.results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: var(--space-2);
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.metric-card {
+  background-color: var(--bg-surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.metric-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-muted);
+}
+
+.metric-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  font-family: var(--font-mono);
+}
+
+/* Result provenance + recent run history */
+.result-context-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  background-color: var(--bg-surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  margin-bottom: var(--space-2);
+}
+.result-context-line span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-runs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.recent-runs-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-surface-raised);
+}
+.recent-runs-list .run-tool {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.recent-runs-list .run-meta {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Layer matrix view */
+.matrix-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+}
+.matrix-header p { font-size: 11px; }
+.matrix-scroll { flex: 1; min-height: 0; overflow: auto; }
+.matrix-table td, .matrix-table th { padding: 6px 10px; }
+.matrix-table .num { font-family: var(--font-mono); text-align: right; }
+.matrix-table .mono { font-family: var(--font-mono); font-size: 10.5px; }
+.matrix-table .small, .matrix-footer { font-size: 10px; color: var(--text-muted); }
+.matrix-table .layer-color-dot {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 3px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.matrix-empty {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: var(--space-1);
+  color: var(--text-muted); text-align: center;
+}
+.matrix-empty h3 { font-size: 13px; color: var(--text-secondary); margin: 8px 0 0; }
+.matrix-empty p { font-size: 11px; max-width: 340px; line-height: 1.5; }
+.matrix-footer {
+  display: flex; justify-content: space-between;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Result preview table (calculation outputs) */
+.result-preview {
+  display: flex; flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  min-height: 0;
+}
+.result-preview-meta {
+  display: flex; justify-content: space-between;
+  font-size: 9.5px; color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+.result-preview-scroll {
+  max-height: 34vh;
+  overflow: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+.result-preview-scroll .data-table td,
+.result-preview-scroll .data-table th { padding: 3px 8px; font-size: 10px; }
+.result-preview-scroll .row-index { color: var(--text-muted); font-family: var(--font-mono); }
+.result-preview-empty {
+  padding: var(--space-3);
+  text-align: center; font-size: 10.5px; color: var(--text-muted);
+}
+

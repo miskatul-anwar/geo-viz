@@ -246,6 +246,10 @@
 
             @if (State.LastResult is { } result)
             {
+                <div class="result-context-line" title="@_lastInputLabel">
+                    <LucideIcon Name="layers" Size="11" Color="var(--text-muted)" />
+                    <span><strong>@result.ToolName</strong> · input: @(_lastInputLabel ?? "unknown layer")</span>
+                </div>
                 <div class="metrics-grid">
                     <div class="metric-card">
                         <span class="metric-label">Output features</span>
@@ -296,6 +300,23 @@
                     <p style="font-size: 10px; margin-top: 4px;">Select tool parameters and click 'Run Analysis' to inspect results.</p>
                 </div>
             }
+
+            @if (State.RecentRuns.Count > 0)
+            {
+                <section style="margin-top: var(--space-3); border-top: 1px solid var(--border-subtle); padding-top: var(--space-2);" aria-label="Recent Analyses">
+                    <h4 style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin: 0 0 var(--space-1) 0;">Recent Runs</h4>
+                    <ul class="recent-runs-list">
+                        @foreach (var run in State.RecentRuns.Take(8))
+                        {
+                            <li title="@run.CreatedAt">
+                                <LucideIcon Name="check-circle-2" Size="11" Color="var(--color-success, #4ade80)" />
+                                <span class="run-tool">@HumanizeTool(run.ToolName)</span>
+                                <span class="run-meta">@FormatRunTime(run.CreatedAt) · @(run.ExecutionTimeMs)ms</span>
+                            </li>
+                        }
+                    </ul>
+                </section>
+            }
         </aside>
     </section>
 </main>
@@ -322,6 +343,7 @@
     private bool _isAdding;
     private bool _justAdded;
     private string? _runError;
+    private string? _lastInputLabel;
 
     protected override void OnInitialized()
     {
@@ -436,6 +458,8 @@
         _runError = null;
         try
         {
+            var inputLabel = LayerChoices.FirstOrDefault(c => c.DatasetId == _datasetId)?.Label;
+            _lastInputLabel = inputLabel is null ? "unknown layer" : inputLabel.Split('·')[0].Trim();
             await State.RunToolAsync(tab.ActiveTool, _datasetId, BuildParameters(tab.ActiveTool));
             try
             {
@@ -498,4 +522,18 @@
         var idx = message.IndexOf(marker, StringComparison.Ordinal);
         return idx >= 0 ? message[(idx + marker.Length + 1)..] : message;
     }
+
+    private static string HumanizeTool(string key) => ToolCatalog.ById.TryGetValue(key, out var info)
+        ? info.Name
+        : key.Replace('_', ' ');
+
+    private static string FormatRunTime(string iso) => DateTime.TryParse(iso, out var t)
+        ? (DateTime.UtcNow - t.ToUniversalTime()) switch
+        {
+            { TotalMinutes: < 1 } ts => $"{Math.Max(1, (int)ts.TotalSeconds)}s ago",
+            { TotalHours: < 1 } ts => $"{(int)ts.TotalMinutes}m ago",
+            { TotalDays: < 1 } ts => $"{(int)ts.TotalHours}h ago",
+            var ts => $"{(int)ts.TotalDays}d ago"
+        }
+        : "—";
 }

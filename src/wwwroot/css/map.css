@@ -1,0 +1,420 @@
+/* GeoViz — map studio: canvas, toolbars, TOC, popups, bookmarks */
+/* Map Studio Layout */
+.map-studio-layout {
+  flex: 1 1 0%;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Sidebar TOC */
+.sidebar-toc {
+  width: var(--toc-width);
+  height: 100%;
+  min-height: 0;
+  background-color: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.sidebar-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.layer-list-container {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.layer-card {
+  background-color: var(--bg-surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  transition: border-color 0.1s;
+}
+
+.layer-card:hover {
+  border-color: var(--border-main);
+}
+
+.layer-card.active {
+  border-color: var(--accent);
+}
+
+.layer-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.layer-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  overflow: hidden;
+}
+
+.layer-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.layer-name {
+  font-weight: 600;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.layer-meta-badge {
+  font-size: 9px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.layer-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.layer-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+  font-size: 10px;
+}
+
+.layer-slider-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+}
+
+.layer-slider-row input[type="range"] {
+  flex: 1;
+  height: 3px;
+  accent-color: var(--accent);
+}
+
+.layer-buttons-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+
+.shape-type-toggle-group {
+  display: flex;
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  gap: 2px;
+  flex: 1;
+}
+
+.shape-type-chip {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 3px 6px;
+  border-radius: calc(var(--radius-sm) - 2px);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.shape-type-chip:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-surface-raised);
+}
+
+.shape-type-chip.active {
+  background-color: var(--accent);
+  color: var(--text-inverse);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+/* Map Canvas Container */
+.map-canvas-wrapper {
+  flex: 1 1 0%;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  background-color: var(--bg-app);
+}
+
+#map-container {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+/* Floating Map Overlay Controls */
+.map-floating-toolbar {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-main);
+  padding: 2px var(--space-1);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+.map-basemap-selector {
+  position: absolute;
+  top: var(--space-2);
+  right: 50px;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-main);
+  padding: 2px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+.basemap-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.basemap-btn:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-surface-raised);
+}
+
+.basemap-btn.active {
+  background-color: var(--accent);
+  color: var(--text-inverse);
+  font-weight: 700;
+}
+
+/* Map Status Bar (Pinned to bottom of canvas) */
+.map-statusbar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--statusbar-height);
+  min-height: var(--statusbar-height);
+  background-color: var(--bg-surface);
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+  z-index: 500;
+  user-select: none;
+}
+
+.statusbar-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Leaflet Themed Controls */
+.leaflet-bar {
+  border: 1px solid var(--border-main) !important;
+  box-shadow: var(--shadow-md) !important;
+  border-radius: var(--radius-md) !important;
+  overflow: hidden;
+}
+
+.leaflet-bar a,
+.leaflet-bar a:hover {
+  background-color: var(--bg-surface) !important;
+  color: var(--text-primary) !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
+  width: 26px !important;
+  height: 26px !important;
+  line-height: 26px !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  transition: background-color 0.1s ease, color 0.1s ease !important;
+}
+
+.leaflet-bar a:hover {
+  background-color: var(--bg-surface-hover) !important;
+  color: var(--accent) !important;
+}
+
+.leaflet-bar a:last-child {
+  border-bottom: none !important;
+}
+
+.leaflet-bar a.leaflet-disabled {
+  background-color: var(--bg-surface-raised) !important;
+  color: var(--text-muted) !important;
+}
+
+.leaflet-control-scale-line {
+  background-color: var(--bg-surface) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-top: none !important;
+  color: var(--text-secondary) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 9px !important;
+  padding: 1px 4px !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+/* Custom Popup Theming */
+.geoviz-custom-popup .leaflet-popup-content-wrapper {
+  background-color: var(--bg-surface) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-main) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-lg) !important;
+  padding: 0 !important;
+}
+
+.geoviz-custom-popup .leaflet-popup-tip {
+  background-color: var(--bg-surface) !important;
+  border: 1px solid var(--border-main) !important;
+}
+
+.geoviz-popup-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.geoviz-popup-table th {
+  background-color: var(--bg-surface-raised);
+  padding: 4px 7px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+}
+.geoviz-popup-table td {
+  padding: 3px 7px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+
+/* Feature attribute labels (permanent tooltips) */
+.geoviz-feature-label {
+  background: rgba(15, 23, 42, 0.78) !important;
+  color: #f1f5f9 !important;
+  border: none !important;
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.25) !important;
+  font-size: 9px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  padding: 1px 5px !important;
+  border-radius: 3px !important;
+  text-shadow: none !important;
+}
+.geoviz-feature-label::before {
+  display: none !important; /* hide tooltip arrow */
+}
+
+/* Bookmarks popover on the map toolbar */
+.bookmark-panel {
+  position: absolute;
+  top: calc(12px + var(--space-4) * 2);
+  right: 12px;
+  z-index: 900;
+  width: 250px;
+  max-height: 46%;
+  overflow-y: auto;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-main);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  box-shadow: var(--shadow-md, 0 8px 24px rgba(0, 0, 0, 0.35));
+}
+
+/* Map empty-state hint */
+.map-empty-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  text-align: center;
+  pointer-events: none;
+  z-index: 500;
+  background: radial-gradient(ellipse at center, transparent 30%, var(--bg-app) 90%);
+  color: var(--text-muted);
+  animation: fadeIn 0.4s ease;
+}
+.map-empty-hint h3 {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 8px 0 0;
+}
+.map-empty-hint p {
+  font-size: 11px;
+  max-width: 320px;
+  line-height: 1.5;
+}
+
