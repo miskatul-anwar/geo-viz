@@ -40,6 +40,7 @@ src/ (Blazor WASM)
 4. **Typed errors everywhere.** `AppError` converts `sqlx`/`serde_json`/IO/base64 errors at the boundary and serializes as a presentable string across IPC; the UI surfaces it in one banner.
 5. **Per-connection SQLite pragmas** via `SqliteConnectOptions` (WAL persistence is database-level, but `foreign_keys`/`busy_timeout` are connection-level — a common sqlx pitfall).
 6. **Offline-first assets**: Leaflet vendored under `wwwroot/lib`, no CDN scripts or fonts; strict CSP allow-lists tile hosts for `img-src`.
+7. **IPC naming convention**: Tauri expects *camelCase* argument keys by default, but this codebase standardizes on **snake_case** end-to-end. Every command therefore MUST be declared `#[tauri::command(rename_all = "snake_case")]` and every JS/C# call site must send snake_case keys (matching Rust parameter names exactly). A missing rename attribute surfaces at runtime as `invalid args … missing required key <camelCaseName>`. Extra keys in an args object are ignored, and `Option<T>` parameters may be omitted entirely.
 
 ## Testing strategy
 

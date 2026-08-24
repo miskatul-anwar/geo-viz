@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-24
+
+### Fixed
+- **Critical**: importing datasets (GeoJSON/Shapefile/KML/KMZ/GPX/GeoPackage) and running geoprocessing tools failed with `invalid args … missing required key <camelCase>`. Tauri expects camelCase argument keys by default while GeoViz sends snake_case; every command now declares `#[tauri::command(rename_all = "snake_case")]` so the IPC contract matches the codebase-wide snake_case convention. Documented in ARCHITECTURE.md and enforced via the contributing checklist.
+
+
 ## [0.2.0] - 2026-08-24
 
 ### Added

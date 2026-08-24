@@ -34,8 +34,9 @@ Non-negotiables:
 1. **Backend-heavy**: new capabilities go into the Rust engine first; the UI stays a thin renderer.
 2. **Typed errors**: return `AppResult<T>` / surface messages through `AppState.Error`; never swallow exceptions.
 3. **Tests**: every new `gis/` algorithm or service path needs `tests.rs` coverage. PRs that lower coverage will be asked to add tests.
-4. **No comments unless they explain *why***; keep code self-describing.
-5. Run before pushing:
+4. **IPC contract**: commands must use `#[tauri::command(rename_all = "snake_case")]` and call sites must pass snake_case keys matching Rust parameters (see ARCHITECTURE.md → IPC naming convention).
+5. **No comments unless they explain *why***; keep code self-describing.
+6. Run before pushing:
 
 ```bash
 cargo fmt --manifest-path src-tauri/Cargo.toml

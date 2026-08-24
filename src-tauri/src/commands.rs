@@ -16,7 +16,7 @@ use tauri::State;
 // Ingestion & provisioning (backend-owned pipeline)
 // ---------------------------------------------------------------------------
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn import_dataset(
     state: State<'_, AppDb>,
     name: Option<String>,
@@ -26,7 +26,7 @@ pub async fn import_dataset(
     dataset_service::import_dataset(&state, name, &payload, &source_format).await
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn add_result_layer(
     state: State<'_, AppDb>,
     result: SpatialAnalysisResult,
@@ -41,22 +41,22 @@ pub async fn add_result_layer(
 // Datasets
 // ---------------------------------------------------------------------------
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn save_dataset(state: State<'_, AppDb>, dataset: DatasetDetail) -> AppResult<()> {
     state.save_dataset(&dataset).await
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_datasets(state: State<'_, AppDb>) -> AppResult<Vec<DatasetSummary>> {
     state.list_datasets().await
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn get_dataset(state: State<'_, AppDb>, id: String) -> AppResult<Option<DatasetDetail>> {
     state.get_dataset_detail(&id).await
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn delete_dataset(state: State<'_, AppDb>, id: String) -> AppResult<bool> {
     state.delete_dataset(&id).await
 }
@@ -65,17 +65,17 @@ pub async fn delete_dataset(state: State<'_, AppDb>, id: String) -> AppResult<bo
 // Layers
 // ---------------------------------------------------------------------------
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn save_layer(state: State<'_, AppDb>, layer: Layer) -> AppResult<()> {
     state.save_layer(&layer).await
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_layers(state: State<'_, AppDb>) -> AppResult<Vec<Layer>> {
     state.list_layers().await
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn delete_layer(state: State<'_, AppDb>, id: String) -> AppResult<bool> {
     state.delete_layer(&id).await
 }
@@ -84,17 +84,17 @@ pub async fn delete_layer(state: State<'_, AppDb>, id: String) -> AppResult<bool
 // Calculation tabs
 // ---------------------------------------------------------------------------
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn save_calculation_tab(state: State<'_, AppDb>, tab: CalculationTab) -> AppResult<()> {
     state.save_tab(&tab).await
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_calculation_tabs(state: State<'_, AppDb>) -> AppResult<Vec<CalculationTab>> {
     state.list_tabs().await
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn delete_calculation_tab(state: State<'_, AppDb>, id: String) -> AppResult<bool> {
     state.delete_tab(&id).await
 }
@@ -103,12 +103,12 @@ pub async fn delete_calculation_tab(state: State<'_, AppDb>, id: String) -> AppR
 // SQL console & stats
 // ---------------------------------------------------------------------------
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn execute_sql_query(state: State<'_, AppDb>, sql: String) -> AppResult<SqlQueryResult> {
     state.execute_sql_query(&sql).await
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn get_database_stats(state: State<'_, AppDb>) -> AppResult<DatabaseStats> {
     state.get_stats().await
 }
@@ -119,7 +119,7 @@ pub async fn get_database_stats(state: State<'_, AppDb>) -> AppResult<DatabaseSt
 
 macro_rules! tool_command {
     ($name:ident { $($arg:ident : $ty:ty),* } => $kind:expr, $params:expr) => {
-        #[tauri::command]
+        #[tauri::command(rename_all = "snake_case")]
         pub async fn $name(
             state: State<'_, AppDb>,
             dataset_id: Option<String>,
@@ -155,7 +155,7 @@ tool_command!(run_random_points_tool { count: usize, restrict_to_polygons: bool 
     ToolParams { count: Some(count), restrict_to_polygons, ..Default::default() });
 
 /// Spatial query keeps its richer signature because of its secondary mask input.
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 #[allow(clippy::too_many_arguments)]
 pub async fn run_spatial_query_tool(
     state: State<'_, AppDb>,
@@ -189,7 +189,7 @@ pub async fn run_spatial_query_tool(
 }
 
 /// Distance matrix treats its secondary input as the optional target set.
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn run_distance_matrix_tool(
     state: State<'_, AppDb>,
     source_dataset_id: Option<String>,
@@ -215,7 +215,7 @@ pub async fn run_distance_matrix_tool(
 
 /// Overlay analysis: intersection / difference / symmetric difference / clip
 /// against a boundary dataset supplied as the secondary input.
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn run_overlay_tool(
     state: State<'_, AppDb>,
     dataset_id: Option<String>,
@@ -239,7 +239,7 @@ pub async fn run_overlay_tool(
     .await
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn run_dissolve_tool(
     state: State<'_, AppDb>,
     dataset_id: Option<String>,
@@ -262,7 +262,7 @@ pub async fn run_dissolve_tool(
 }
 
 /// Spatial join attaches attributes of the polygon target layer onto the source.
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn run_spatial_join_tool(
     state: State<'_, AppDb>,
     dataset_id: Option<String>,
@@ -288,7 +288,7 @@ pub async fn run_spatial_join_tool(
 // Symbology: attribute classification for categorized/graduated rendering
 // ---------------------------------------------------------------------------
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn compute_class_breaks(
     state: State<'_, AppDb>,
     dataset_id: String,
@@ -315,17 +315,17 @@ pub async fn compute_class_breaks(
 // Spatial bookmarks
 // ---------------------------------------------------------------------------
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn save_bookmark(state: State<'_, AppDb>, bookmark: MapBookmark) -> AppResult<()> {
     state.save_bookmark(&bookmark).await
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_bookmarks(state: State<'_, AppDb>) -> AppResult<Vec<MapBookmark>> {
     state.list_bookmarks().await
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn delete_bookmark(state: State<'_, AppDb>, id: String) -> AppResult<bool> {
     state.delete_bookmark(&id).await
 }
