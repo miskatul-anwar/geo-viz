@@ -129,6 +129,31 @@
                                 </select>
                             </div>
 
+                            <div class="layer-slider-row">
+                                <span style="width: 65px;">Blend:</span>
+                                <select class="form-control" style="flex: 1; padding: 1px 4px; font-size: 10px;"
+                                        value="@(layer.Style.BlendMode ?? "normal")"
+                                        @onchange="@(e => SetBlendMode(layer, e))"
+                                        aria-label="Layer blending mode">
+                                    <option value="normal">Normal</option>
+                                    <option value="multiply">Multiply</option>
+                                    <option value="screen">Screen</option>
+                                    <option value="overlay">Overlay</option>
+                                    <option value="darken">Darken</option>
+                                    <option value="lighten">Lighten</option>
+                                    <option value="color-dodge">Color Dodge</option>
+                                    <option value="color-burn">Color Burn</option>
+                                    <option value="hard-light">Hard Light</option>
+                                    <option value="soft-light">Soft Light</option>
+                                    <option value="difference">Difference</option>
+                                    <option value="exclusion">Exclusion</option>
+                                    <option value="hue">Hue</option>
+                                    <option value="saturation">Saturation</option>
+                                    <option value="color">Color</option>
+                                    <option value="luminosity">Luminosity</option>
+                                </select>
+                            </div>
+
                             <div class="layer-slider-row" style="flex-wrap: wrap; gap: var(--space-1);">
                                 <span style="width: 65px;">Classes:</span>
                                 @if (layer.Style.Classification is { } cls)
@@ -141,9 +166,10 @@
                                 }
                                 else
                                 {
+                                    var draft = ClassDraftFor(layer);
                                     <select class="form-control" style="flex: 1; padding: 1px 4px; font-size: 10px;"
-                                            value="@_classifyField"
-                                            @onchange="@(e => _classifyField = e.Value?.ToString() ?? "")"
+                                            value="@draft.Field"
+                                            @onchange="@(e => SetClassField(layer, e))"
                                             aria-label="Classification field">
                                         <option value="">-- Field --</option>
                                         @foreach (var f in SchemaFields(layer))
@@ -152,19 +178,19 @@
                                         }
                                     </select>
                                     <select class="form-control" style="width: 92px; padding: 1px 4px; font-size: 10px;"
-                                            value="@_classifyMethod" @onchange="@(e => _classifyMethod = e.Value?.ToString() ?? "equal_interval")"
+                                            value="@draft.Method" @onchange="@(e => SetClassMethod(layer, e))"
                                             aria-label="Classification method">
                                         <option value="equal_interval">Equal Int.</option>
                                         <option value="quantile">Quantile</option>
                                     </select>
                                     <input type="number" min="2" max="12"
                                            class="form-control" style="width: 52px; padding: 1px 4px; font-size: 10px;"
-                                           value="@_classifyClasses.ToString()"
-                                           @onchange="@(e => int.TryParse(e.Value?.ToString(), out _classifyClasses))"
+                                           value="@draft.Classes.ToString()"
+                                           @onchange="@(e => SetClassCount(layer, e))"
                                            aria-label="Number of classes" />
-                                    <button class="btn btn-secondary btn-sm" style="padding: 1px 8px;" disabled="@string.IsNullOrEmpty(_classifyField)"
+                                    <button class="btn btn-secondary btn-sm" style="padding: 1px 8px;" disabled="@string.IsNullOrEmpty(draft.Field)"
                                             title="Compute categorized symbology on the backend"
-                                            @onclick="@(async _ => await State.ClassifyLayerAsync(layer, _classifyField, _classifyMethod, _classifyClasses))"
+                                            @onclick="@(async _ => await State.ClassifyLayerAsync(layer, draft.Field, draft.Method, draft.Classes))"
                                             aria-label="Apply Classification">
                                         <LucideIcon Name="play" Size="10" />
                                     </button>
@@ -204,10 +230,27 @@
     [Parameter] public EventCallback<string> OnOpenAttributeTable { get; set; }
 
     private string? ExpandedLayerId { get; set; }
-    private string _classifyField = "";
-    private string _classifyMethod = "equal_interval";
-    private int _classifyClasses = 5;
+
+    /// <summary>Per-layer classification drafts: what you pick for one layer never leaks into another.</summary>
+    private sealed record ClassDraft(string Field, string Method, int Classes);
+
+    private readonly Dictionary<string, ClassDraft> _classDrafts = new();
     private readonly Dictionary<string, string> _labelDrafts = new();
+
+    private ClassDraft ClassDraftFor(Layer layer) =>
+        _classDrafts.TryGetValue(layer.Id, out var draft) ? draft : new ClassDraft("", "equal_interval", 5);
+
+    private void SetClassField(Layer layer, ChangeEventArgs e) =>
+        _classDrafts[layer.Id] = ClassDraftFor(layer) with { Field = e.Value?.ToString() ?? "" };
+
+    private void SetClassMethod(Layer layer, ChangeEventArgs e) =>
+        _classDrafts[layer.Id] = ClassDraftFor(layer) with { Method = e.Value?.ToString() ?? "equal_interval" };
+
+    private void SetClassCount(Layer layer, ChangeEventArgs e) =>
+        _classDrafts[layer.Id] = ClassDraftFor(layer) with
+        {
+            Classes = int.TryParse(e.Value?.ToString(), out var n) ? Math.Clamp(n, 2, 12) : 5
+        };
 
     /// <summary>Attribute fields from the layer's dataset schema (label/class candidates).</summary>
     private List<string> SchemaFields(Layer layer) =>
@@ -239,14 +282,32 @@
         await State.SetLabelFieldAsync(layer, field);
     }
 
+    private Task SetBlendMode(Layer layer, ChangeEventArgs e) =>
+        UpdateAndPersist(layer, l =>
+        {
+            var mode = e.Value?.ToString();
+            l.Style.BlendMode = string.IsNullOrEmpty(mode) || mode == "normal" ? null : mode;
+        });
+
     private void RequestAddLayer()
     {
         if (OnAddLayer.HasDelegate)
             _ = OnAddLayer.InvokeAsync();
     }
 
-    private void ToggleExpand(string id) =>
+    private void ToggleExpand(string id)
+    {
         ExpandedLayerId = ExpandedLayerId == id ? null : id;
+
+        // Expanding symbology needs the dataset schema; resolve on demand so the
+        // label/class dropdowns list real fields instead of only the default option.
+        if (ExpandedLayerId is { } openId)
+        {
+            var layer = State.Layers.FirstOrDefault(l => l.Id == openId);
+            if (layer is not null && State.GetCachedDataset(layer.DatasetId) is null)
+                _ = State.ResolveDatasetAsync(layer.DatasetId);
+        }
+    }
 
     private async Task ToggleVisibility(Layer layer) => await State.ToggleVisibilityAsync(layer);
 

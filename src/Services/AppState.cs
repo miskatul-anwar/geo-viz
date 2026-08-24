@@ -16,6 +16,7 @@ public sealed class AppState
     private readonly List<CalculationTab> _tabs = new();
     private readonly List<MapBookmark> _bookmarks = new();
     private readonly List<CalculationRun> _recentRuns = new();
+    private readonly List<RasterSummary> _rasters = new();
 
     public AppState(TauriService tauri)
     {
@@ -30,31 +31,24 @@ public sealed class AppState
     public IReadOnlyList<CalculationTab> Tabs => _tabs;
     public IReadOnlyList<MapBookmark> Bookmarks => _bookmarks;
     public IReadOnlyList<CalculationRun> RecentRuns => _recentRuns;
+    public IReadOnlyList<RasterSummary> Rasters => _rasters;
 
     public string? ActiveLayerId { get; private set; }
     public string? ActiveTabId { get; private set; }
+
+    /// <summary>Index of the feature last clicked on the map (table sync).</summary>
+    public int? ActiveFeatureIndex { get; private set; }
+
+    public void SetActiveFeature(int? index)
+    {
+        ActiveFeatureIndex = index;
+        Notify();
+    }
     public DatabaseStats? Stats { get; private set; }
     public SpatialAnalysisResult? LastResult { get; private set; }
 
     /// <summary>Last operation error, surfaced once by the UI then dismissed.</summary>
     public string? Error { get; private set; }
-
-    /// <summary>Dataset queued by another view (e.g. Layer Matrix) to preselect in the calculator.</summary>
-    public string? PendingCalculationDatasetId { get; private set; }
-
-    public void QueueCalculationFor(string datasetId)
-    {
-        PendingCalculationDatasetId = datasetId;
-        Notify();
-    }
-
-    /// <summary>Acknowledges and clears a queued calculation target (no re-render).</summary>
-    public string? ConsumePendingCalculation()
-    {
-        var pending = PendingCalculationDatasetId;
-        PendingCalculationDatasetId = null;
-        return pending;
-    }
 
     public Layer? ActiveLayer => _layers.FirstOrDefault(l => l.Id == ActiveLayerId);
 
@@ -123,6 +117,16 @@ public sealed class AppState
         catch
         {
             /* history is non-critical at startup */
+        }
+
+        try
+        {
+            _rasters.Clear();
+            _rasters.AddRange(await _tauri.ListRastersAsync());
+        }
+        catch
+        {
+            /* rasters are non-critical at startup */
         }
 
         if (ActiveLayerId is not null && _layers.All(l => l.Id != ActiveLayerId))
@@ -359,6 +363,68 @@ public sealed class AppState
                 args["join_dataset_id"] = args.TryGetValue("filter_dataset_id", out var joinId) ? joinId : null;
                 result = await _tauri.RunToolCommandAsync("run_spatial_join_tool", args);
                 break;
+            // --- Spatial statistics ---
+            case "mean_center":
+                result = await _tauri.RunToolCommandAsync("run_mean_center_tool", args);
+                break;
+            case "median_center":
+                result = await _tauri.RunToolCommandAsync("run_median_center_tool", args);
+                break;
+            case "directional_mean":
+                result = await _tauri.RunToolCommandAsync("run_directional_mean_tool", args);
+                break;
+            case "morans_i":
+                result = await _tauri.RunToolCommandAsync("run_morans_i_tool", args);
+                break;
+            case "getis_ord":
+                result = await _tauri.RunToolCommandAsync("run_getis_ord_tool", args);
+                break;
+            case "ols_regression":
+                result = await _tauri.RunToolCommandAsync("run_ols_tool", args);
+                break;
+            // --- Geostatistics ---
+            case "idw":
+                result = await _tauri.RunToolCommandAsync("run_idw_tool", args);
+                break;
+            case "kriging":
+                result = await _tauri.RunToolCommandAsync("run_kriging_tool", args);
+                break;
+            // --- Network ---
+            case "shortest_path":
+                result = await _tauri.RunToolCommandAsync("run_shortest_path_tool", args);
+                break;
+            case "service_area":
+                result = await _tauri.RunToolCommandAsync("run_service_area_tool", args);
+                break;
+            case "od_matrix":
+                result = await _tauri.RunToolCommandAsync("run_od_matrix_tool", args);
+                break;
+            // --- Topology & joins ---
+            case "topology_check":
+                result = await _tauri.RunToolCommandAsync("run_topology_tool", args);
+                break;
+            case "join_csv":
+                result = await _tauri.RunToolCommandAsync("run_join_csv_tool", args);
+                break;
+            // --- Raster (Spatial Analyst) ---
+            case "slope":
+                result = await _tauri.RunToolCommandAsync("run_slope_tool", args);
+                break;
+            case "hillshade":
+                result = await _tauri.RunToolCommandAsync("run_hillshade_tool", args);
+                break;
+            case "raster_calculator":
+                result = await _tauri.RunToolCommandAsync("run_raster_calculator_tool", args);
+                break;
+            case "d8_flow":
+                result = await _tauri.RunToolCommandAsync("run_d8_tool", args);
+                break;
+            case "zonal_stats":
+                result = await _tauri.RunToolCommandAsync("run_zonal_stats_tool", args);
+                break;
+            case "viewshed":
+                result = await _tauri.RunToolCommandAsync("run_viewshed_tool", args);
+                break;
             default:
                 throw new InvalidOperationException($"Unknown tool '{toolKey}'.");
         }
@@ -408,14 +474,14 @@ public sealed class AppState
             Method = method,
             Breaks = breaks
         };
-        layer.Style.FillColor = "#7fcdbb"; // neutral base; classified features override per-class colors
+        // The user's base fill color is preserved; classified features are
+        // colored per-class by the renderer, unmatched features keep the base.
         await PersistLayerAsync(layer);
     }
 
     public async Task ClearClassificationAsync(Layer layer)
     {
         layer.Style.Classification = null;
-        layer.Style.FillColor = "#38bdf8";
         await PersistLayerAsync(layer);
     }
 
@@ -437,6 +503,27 @@ public sealed class AppState
     {
         await _tauri.DeleteBookmarkAsync(id);
         _bookmarks.RemoveAll(b => b.Id == id);
+        Notify();
+    }
+
+    // ------------------------------------------------------------------
+    // Rasters (Spatial Analyst)
+    // ------------------------------------------------------------------
+
+    public async Task<RasterSummary> ImportRasterAsync(string? name, string tiffBase64)
+    {
+        var summary = await _tauri.ImportRasterAsync(name, tiffBase64);
+        _rasters.Insert(0, summary);
+        await RefreshStatsInternalAsync();
+        ClearError();
+        Notify();
+        return summary;
+    }
+
+    public async Task DeleteRasterAsync(string id)
+    {
+        await _tauri.DeleteRasterAsync(id);
+        _rasters.RemoveAll(r => r.Id == id);
         Notify();
     }
 

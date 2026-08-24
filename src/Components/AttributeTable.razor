@@ -79,7 +79,8 @@
                 </thead>
                 <tbody>
                     <Virtualize Items="@IndexedRows" ItemSize="26" OverscanCount="20" Context="entry">
-                        <tr class="@(SelectedRowIndex == entry.Index ? "selected" : "")"
+                        <tr data-row-index="@entry.Index"
+                            class="@(SelectedRowIndex == entry.Index ? "selected" : "")"
                             @onclick="() => SelectRow(entry.Index)" role="row" tabindex="0" title="Click to zoom to feature">
                             <td style="color: var(--text-muted); font-family: var(--font-mono);" role="gridcell">@(entry.Index + 1)</td>
                             @foreach (var col in Columns)
@@ -137,6 +138,25 @@
         {
             _loadedDatasetKey = key;
             ParseDatasetFeatures(detail);
+        }
+
+        // Map -> table sync: highlight (and reveal) the clicked feature's row.
+        if (State.ActiveFeatureIndex is { } featureIndex && featureIndex != SelectedRowIndex)
+        {
+            SelectedRowIndex = featureIndex;
+            _ = InvokeAsync(async () =>
+            {
+                StateHasChanged();
+                try
+                {
+                    await JsRuntime.InvokeVoidAsync("geoVizTable.revealRow", featureIndex);
+                }
+                catch
+                {
+                    /* reveal is best-effort */
+                }
+            });
+            return;
         }
         _ = InvokeAsync(StateHasChanged);
     }
@@ -254,8 +274,10 @@
                 : list.OrderByDescending(r => r.TryGetValue(SortColumn, out var v) ? v : "");
         }
 
+        var indexById = new Dictionary<Dictionary<string, string>, int>(AllRows.Count);
+        for (var i = 0; i < AllRows.Count; i++) indexById[AllRows[i]] = i;
         FilteredRows = list.ToList();
-        IndexedRows = FilteredRows.Select((row, index) => (index, row)).ToList();
+        IndexedRows = FilteredRows.Select(row => (indexById[row], row)).ToList();
     }
 
     public void SortBy(string column)

@@ -331,6 +331,343 @@ pub async fn delete_bookmark(state: State<'_, AppDb>, id: String) -> AppResult<b
 }
 
 // ---------------------------------------------------------------------------
+// Spatial Statistics, Geostatistics, Network, Topology, Joins
+// ---------------------------------------------------------------------------
+
+tool_command!(run_mean_center_tool { } => ToolKind::MeanCenter, ToolParams::default());
+tool_command!(run_median_center_tool { } => ToolKind::MedianCenter, ToolParams::default());
+tool_command!(run_directional_mean_tool { } => ToolKind::DirectionalMean, ToolParams::default());
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn run_morans_i_tool(
+    state: State<'_, AppDb>,
+    dataset_id: Option<String>,
+    attribute_field: String,
+    tab_id: String,
+) -> AppResult<SpatialAnalysisResult> {
+    tool_service::run_tool(
+        &state,
+        ToolKind::MoransI,
+        ToolParams {
+            attribute_field: Some(attribute_field),
+            ..Default::default()
+        },
+        dataset_id,
+        None,
+        tab_id,
+    )
+    .await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn run_getis_ord_tool(
+    state: State<'_, AppDb>,
+    dataset_id: Option<String>,
+    attribute_field: String,
+    band_meters: Option<f64>,
+    tab_id: String,
+) -> AppResult<SpatialAnalysisResult> {
+    tool_service::run_tool(
+        &state,
+        ToolKind::GetisOrd,
+        ToolParams {
+            attribute_field: Some(attribute_field),
+            band_meters,
+            ..Default::default()
+        },
+        dataset_id,
+        None,
+        tab_id,
+    )
+    .await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn run_ols_tool(
+    state: State<'_, AppDb>,
+    dataset_id: Option<String>,
+    attribute_field: String,
+    explanatory_csv: String,
+    tab_id: String,
+) -> AppResult<SpatialAnalysisResult> {
+    tool_service::run_tool(
+        &state,
+        ToolKind::OlsRegression,
+        ToolParams {
+            attribute_field: Some(attribute_field),
+            explanatory_csv: Some(explanatory_csv),
+            ..Default::default()
+        },
+        dataset_id,
+        None,
+        tab_id,
+    )
+    .await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn run_idw_tool(
+    state: State<'_, AppDb>,
+    dataset_id: Option<String>,
+    attribute_field: String,
+    idw_power: Option<f64>,
+    cell_size_km: Option<f64>,
+    max_neighbors: Option<usize>,
+    tab_id: String,
+) -> AppResult<SpatialAnalysisResult> {
+    tool_service::run_tool(
+        &state,
+        ToolKind::Idw,
+        ToolParams {
+            attribute_field: Some(attribute_field),
+            idw_power,
+            cell_size_km,
+            max_neighbors,
+            ..Default::default()
+        },
+        dataset_id,
+        None,
+        tab_id,
+    )
+    .await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn run_kriging_tool(
+    state: State<'_, AppDb>,
+    dataset_id: Option<String>,
+    attribute_field: String,
+    variogram_model: Option<String>,
+    cell_size_km: Option<f64>,
+    max_neighbors: Option<usize>,
+    tab_id: String,
+) -> AppResult<SpatialAnalysisResult> {
+    tool_service::run_tool(
+        &state,
+        ToolKind::Kriging,
+        ToolParams {
+            attribute_field: Some(attribute_field),
+            variogram_model,
+            cell_size_km,
+            max_neighbors,
+            ..Default::default()
+        },
+        dataset_id,
+        None,
+        tab_id,
+    )
+    .await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+#[allow(clippy::too_many_arguments)]
+pub async fn run_shortest_path_tool(
+    state: State<'_, AppDb>,
+    dataset_id: Option<String>,
+    start_lng: f64,
+    start_lat: f64,
+    end_lng: f64,
+    end_lat: f64,
+    algorithm: Option<String>,
+    tab_id: String,
+) -> AppResult<SpatialAnalysisResult> {
+    tool_service::run_tool(
+        &state,
+        ToolKind::ShortestPath,
+        ToolParams {
+            start_lng: Some(start_lng),
+            start_lat: Some(start_lat),
+            end_lng: Some(end_lng),
+            end_lat: Some(end_lat),
+            algorithm,
+            ..Default::default()
+        },
+        dataset_id,
+        None,
+        tab_id,
+    )
+    .await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn run_service_area_tool(
+    state: State<'_, AppDb>,
+    dataset_id: Option<String>,
+    start_lng: f64,
+    start_lat: f64,
+    max_distance_m: f64,
+    tab_id: String,
+) -> AppResult<SpatialAnalysisResult> {
+    tool_service::run_tool(
+        &state,
+        ToolKind::ServiceArea,
+        ToolParams {
+            start_lng: Some(start_lng),
+            start_lat: Some(start_lat),
+            max_distance_m: Some(max_distance_m),
+            ..Default::default()
+        },
+        dataset_id,
+        None,
+        tab_id,
+    )
+    .await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn run_od_matrix_tool(
+    state: State<'_, AppDb>,
+    dataset_id: Option<String>,
+    filter_dataset_id: Option<String>,
+    target_dataset_id: Option<String>,
+    tab_id: String,
+) -> AppResult<SpatialAnalysisResult> {
+    tool_service::run_tool(
+        &state,
+        ToolKind::OdMatrix,
+        ToolParams {
+            filter_dataset_id,
+            target_dataset_id,
+            ..Default::default()
+        },
+        dataset_id,
+        None,
+        tab_id,
+    )
+    .await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn run_topology_tool(
+    state: State<'_, AppDb>,
+    dataset_id: Option<String>,
+    operation: String,
+    filter_dataset_id: Option<String>,
+    tab_id: String,
+) -> AppResult<SpatialAnalysisResult> {
+    tool_service::run_tool(
+        &state,
+        ToolKind::TopologyCheck,
+        ToolParams {
+            operation: Some(operation),
+            filter_dataset_id,
+            ..Default::default()
+        },
+        dataset_id,
+        None,
+        tab_id,
+    )
+    .await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn run_join_csv_tool(
+    state: State<'_, AppDb>,
+    dataset_id: Option<String>,
+    key_field: String,
+    csv_text: String,
+    csv_key: Option<String>,
+    tab_id: String,
+) -> AppResult<SpatialAnalysisResult> {
+    tool_service::run_tool(
+        &state,
+        ToolKind::JoinCsv,
+        ToolParams {
+            key_field: Some(key_field),
+            csv_text: Some(csv_text),
+            csv_key,
+            ..Default::default()
+        },
+        dataset_id,
+        None,
+        tab_id,
+    )
+    .await
+}
+
+// ---------------------------------------------------------------------------
+// Raster (Spatial Analyst)
+// ---------------------------------------------------------------------------
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn import_raster(
+    state: State<'_, AppDb>,
+    name: Option<String>,
+    tiff_base64: String,
+) -> AppResult<RasterSummary> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(tiff_base64.as_bytes())
+        .map_err(|e| AppError::Parse(format!("invalid base64 TIFF payload: {e}")))?;
+    tool_service::import_raster(&state, name, &bytes).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn list_rasters(state: State<'_, AppDb>) -> AppResult<Vec<RasterSummary>> {
+    state.list_rasters().await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn delete_raster(state: State<'_, AppDb>, id: String) -> AppResult<bool> {
+    state.delete_raster(&id).await
+}
+
+macro_rules! raster_command {
+    ($name:ident { $($arg:ident : $ty:ty),* } => $kind:expr, $params:expr) => {
+        #[tauri::command(rename_all = "snake_case")]
+        #[allow(clippy::field_reassign_with_default)]
+        pub async fn $name(
+            state: State<'_, AppDb>,
+            raster_id: Option<String>,
+            tab_id: String,
+            $($arg: $ty,)*
+        ) -> AppResult<SpatialAnalysisResult> {
+            let mut params: ToolParams = $params;
+            params.raster_id = raster_id;
+            tool_service::run_tool(&state, $kind, params, None, None, tab_id).await
+        }
+    };
+}
+
+raster_command!(run_slope_tool { } => ToolKind::Slope,
+    ToolParams::default());
+
+raster_command!(run_hillshade_tool { azimuth: Option<f64>, altitude: Option<f64> } => ToolKind::Hillshade,
+    ToolParams { azimuth, altitude, ..Default::default() });
+
+raster_command!(run_raster_calculator_tool { expression: String, second_raster_id: Option<String> } => ToolKind::RasterCalculator,
+    ToolParams { expression: Some(expression), second_raster_id, ..Default::default() });
+
+raster_command!(run_d8_tool { } => ToolKind::D8Flow,
+    ToolParams::default());
+
+raster_command!(run_viewshed_tool { observer_lng: f64, observer_lat: f64, observer_height_m: Option<f64> } => ToolKind::Viewshed,
+    ToolParams { observer_lng: Some(observer_lng), observer_lat: Some(observer_lat), observer_height_m, ..Default::default() });
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn run_zonal_stats_tool(
+    state: State<'_, AppDb>,
+    raster_id: Option<String>,
+    filter_dataset_id: Option<String>,
+    tab_id: String,
+) -> AppResult<SpatialAnalysisResult> {
+    // Zonal stats is vector-adjacent: route through run_tool with the raster id in params.
+    tool_service::run_tool(
+        &state,
+        ToolKind::ZonalStats,
+        ToolParams {
+            raster_id,
+            filter_dataset_id,
+            ..Default::default()
+        },
+        None,
+        None,
+        tab_id,
+    )
+    .await
+}
+
+// ---------------------------------------------------------------------------
 // Calculation history
 // ---------------------------------------------------------------------------
 

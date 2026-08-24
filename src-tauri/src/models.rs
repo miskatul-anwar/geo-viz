@@ -51,6 +51,9 @@ pub struct LayerStyle {
     /// Optional attribute used to render feature labels on the map.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label_field: Option<String>,
+    /// Cartographic blending mode applied to the whole layer (QGIS parity).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blend_mode: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,6 +80,7 @@ impl Default for LayerStyle {
             shape_type: "point".to_string(),
             classification: None,
             label_field: None,
+            blend_mode: None,
         }
     }
 }
@@ -140,6 +144,26 @@ pub struct DatabaseStats {
     pub calculation_count: usize,
     pub tab_count: usize,
     pub db_size_bytes: u64,
+}
+
+/// Metadata for a stored raster grid (Spatial Analyst input).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RasterSummary {
+    pub id: String,
+    pub name: String,
+    pub width: usize,
+    pub height: usize,
+    pub cell_size_m: f64,
+    pub bbox: Vec<f64>,
+    pub created_at: String,
+}
+
+/// Full raster grid payload for analysis (data is row-major f64 LE bytes).
+#[derive(Debug, Clone, Serialize)]
+pub struct RasterPayload {
+    #[serde(flatten)]
+    pub summary: RasterSummary,
+    pub data: Vec<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -114,6 +114,18 @@ impl AppDb {
                 created_at TEXT NOT NULL
             );
             "#,
+            r#"
+            CREATE TABLE IF NOT EXISTS rasters (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                width INTEGER NOT NULL,
+                height INTEGER NOT NULL,
+                cell_size_m REAL NOT NULL,
+                bbox TEXT NOT NULL,
+                data BLOB NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            "#,
         ];
 
         for q in queries {
@@ -433,6 +445,82 @@ impl AppDb {
 
     pub async fn delete_bookmark(&self, id: &str) -> AppResult<bool> {
         let res = sqlx::query("DELETE FROM bookmarks WHERE id = ?")
+            .bind(id)
+            .execute(&*self.pool)
+            .await?;
+        Ok(res.rows_affected() > 0)
+    }
+
+    // Raster grids (Spatial Analyst inputs)
+
+    pub async fn save_raster(&self, summary: &RasterSummary, data: &[f64]) -> AppResult<()> {
+        let bytes: Vec<u8> = data.iter().flat_map(|v| v.to_le_bytes()).collect();
+        sqlx::query(
+            "INSERT OR REPLACE INTO rasters (id, name, width, height, cell_size_m, bbox, data, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&summary.id)
+        .bind(&summary.name)
+        .bind(summary.width as i64)
+        .bind(summary.height as i64)
+        .bind(summary.cell_size_m)
+        .bind(serde_json::to_string(&summary.bbox)?)
+        .bind(bytes)
+        .bind(&summary.created_at)
+        .execute(&*self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn list_rasters(&self) -> AppResult<Vec<RasterSummary>> {
+        let rows = sqlx::query(
+            "SELECT id, name, width, height, cell_size_m, bbox, created_at FROM rasters ORDER BY created_at DESC",
+        )
+        .fetch_all(&*self.pool)
+        .await?;
+        Ok(rows
+            .iter()
+            .map(|r| RasterSummary {
+                id: r.get("id"),
+                name: r.get("name"),
+                width: r.get::<i64, _>("width") as usize,
+                height: r.get::<i64, _>("height") as usize,
+                cell_size_m: r.get("cell_size_m"),
+                bbox: serde_json::from_str(&r.get::<String, _>("bbox")).unwrap_or_default(),
+                created_at: r.get("created_at"),
+            })
+            .collect())
+    }
+
+    /// Load a raster grid; returns None when the id is unknown.
+    pub async fn get_raster(&self, id: &str) -> AppResult<Option<RasterPayload>> {
+        let row = sqlx::query("SELECT id, name, width, height, cell_size_m, bbox, data, created_at FROM rasters WHERE id = ?")
+            .bind(id)
+            .fetch_optional(&*self.pool)
+            .await?;
+        let Some(r) = row else { return Ok(None) };
+        let bytes: Vec<u8> = r.get("data");
+        let data: Vec<f64> = bytes
+            .as_chunks::<8>()
+            .0
+            .iter()
+            .map(|c| f64::from_le_bytes(*c))
+            .collect();
+        Ok(Some(RasterPayload {
+            summary: RasterSummary {
+                id: r.get("id"),
+                name: r.get("name"),
+                width: r.get::<i64, _>("width") as usize,
+                height: r.get::<i64, _>("height") as usize,
+                cell_size_m: r.get("cell_size_m"),
+                bbox: serde_json::from_str(&r.get::<String, _>("bbox")).unwrap_or_default(),
+                created_at: r.get("created_at"),
+            },
+            data,
+        }))
+    }
+
+    pub async fn delete_raster(&self, id: &str) -> AppResult<bool> {
+        let res = sqlx::query("DELETE FROM rasters WHERE id = ?")
             .bind(id)
             .execute(&*self.pool)
             .await?;

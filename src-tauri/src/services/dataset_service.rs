@@ -37,6 +37,7 @@ impl StylePreset {
                 shape_type: "point".into(),
                 classification: None,
                 label_field: None,
+                blend_mode: None,
             },
             StylePreset::Result => LayerStyle {
                 fill_color: "#34d399".into(),
@@ -49,6 +50,7 @@ impl StylePreset {
                 shape_type: "point".into(),
                 classification: None,
                 label_field: None,
+                blend_mode: None,
             },
         }
     }

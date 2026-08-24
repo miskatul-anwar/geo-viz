@@ -92,12 +92,6 @@ html { font-size: 16px; }
   .header-actions .btn span {
     display: none; /* icon-only theme toggle on tiny widths */
   }
-  .matrix-view {
-    padding: var(--space-3);
-  }
-  .matrix-table {
-    min-width: 640px; /* scroll horizontally inside its container, not the page */
-  }
   .map-floating-toolbar {
     flex-wrap: wrap;
     max-width: calc(100% - var(--space-4));
@@ -119,9 +113,6 @@ html { font-size: 16px; }
 }
 
 /* Functional density: reclaim decorative whitespace without shrinking controls */
-.matrix-view {
-  padding: var(--space-3) var(--space-4);
-}
 .calc-results-panel {
   padding: var(--space-3);
   gap: var(--space-2);

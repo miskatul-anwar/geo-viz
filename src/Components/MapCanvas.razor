@@ -182,6 +182,9 @@
                 {
                     if (_syncSignatures.ContainsKey(layer.Id))
                         await JsRuntime.InvokeVoidAsync("geoVizMap.setLayerVisibility", layer.Id, false);
+                    // Record the hidden signature, otherwise re-checking the layer
+                    // produces an identical signature and the rebuild is skipped.
+                    _syncSignatures[layer.Id] = signature;
                     continue;
                 }
 
@@ -208,7 +211,7 @@
     {
         var s = layer.Style;
         var cls = s.Classification is { } c ? $"{c.Field}:{c.Method}:{c.Breaks.Count}:{string.Join(',', c.Breaks.Select(b => b.Color))}" : "";
-        return $"{s.FillColor}{s.StrokeColor}{s.StrokeWidth}{s.PointRadius}{s.FillOpacity}{s.StrokeOpacity}{layer.Opacity}{s.ShapeType}|{cls}|{s.LabelField}";
+        return $"{s.FillColor}{s.StrokeColor}{s.StrokeWidth}{s.PointRadius}{s.FillOpacity}{s.StrokeOpacity}{layer.Opacity}{s.ShapeType}|{cls}|{s.LabelField}|{s.BlendMode}";
     }
 
     private async Task SaveCurrentView()
@@ -246,12 +249,13 @@
         _ = InvokeAsync(StateHasChanged);
     }
 
-    /// <summary>Feature click on the map selects the owning layer in the TOC.</summary>
+    /// <summary>Feature click selects the owning layer and syncs the attribute table row.</summary>
     [JSInvokable]
-    public async Task OnFeatureSelected(string layerId, string propertiesJson)
+    public async Task OnFeatureSelected(string layerId, int featureIndex, string propertiesJson)
     {
         if (State.ActiveLayerId != layerId)
             await State.SelectLayerAsync(layerId);
+        State.SetActiveFeature(featureIndex);
     }
 
     private async Task ChangeBasemap(string key)

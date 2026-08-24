@@ -72,14 +72,14 @@
 
                 <div class="form-group">
                     <label for="primary-dataset-select">Input Layer:</label>
-                    <select id="primary-dataset-select" class="form-control" @bind="_datasetId">
+                    <select id="primary-dataset-select" class="form-control" @bind="_datasetId" disabled="@IsRasterTool(currentTool.Key)">
                         <option value="">-- Select a Layer --</option>
                         @foreach (var choice in LayerChoices)
                         {
                             <option value="@choice.DatasetId">@choice.Label</option>
                         }
                     </select>
-                    @if (LayerChoices.Count == 0)
+                    @if (LayerChoices.Count == 0 && !IsRasterTool(currentTool.Key))
                     {
                         <span class="form-hint">Add layers in Map Studio first — tools run on the layers you have added.</span>
                     }
@@ -209,9 +209,238 @@
                         </select>
                     </div>
                 }
+                else if (currentTool.Key is "morans_i" or "getis_ord" or "ols_regression" or "idw" or "kriging")
+                {
+                    <div class="form-group">
+                        <label for="stat-field-select">@(currentTool.Key == "ols_regression" ? "Dependent Field:" : "Value Field:")</label>
+                        <select id="stat-field-select" class="form-control" @bind="_statField">
+                            <option value="">-- Select Field --</option>
+                            @foreach (var field in InputSchemaFields)
+                            {
+                                <option value="@field">@field</option>
+                            }
+                        </select>
+                    </div>
+                    @if (currentTool.Key == "ols_regression")
+                    {
+                        <div class="form-group">
+                            <label for="explanatory-input">Explanatory Fields (comma-separated):</label>
+                            <input id="explanatory-input" class="form-control" placeholder="e.g. population, median_income" @bind="_explanatoryCsv" />
+                        </div>
+                    }
+                    @if (currentTool.Key == "getis_ord")
+                    {
+                        <div class="form-group">
+                            <label for="band-input">Distance Band (meters, empty = adaptive 3× NN):</label>
+                            <input id="band-input" type="number" min="1" class="form-control" @bind="_bandMeters" />
+                        </div>
+                    }
+                    @if (currentTool.Key is "idw" or "kriging")
+                    {
+                        <div class="form-group">
+                            <label for="cell-size-input">Grid Cell Size (km):</label>
+                            <input id="cell-size-input" type="number" min="0.1" step="1" class="form-control" @bind="_statCellSizeKm" />
+                        </div>
+                        <div class="form-group">
+                            <label for="neighbors-input">Max Neighbors:</label>
+                            <input id="neighbors-input" type="number" min="1" max="64" class="form-control" @bind="_statMaxNeighbors" />
+                        </div>
+                    }
+                    @if (currentTool.Key == "idw")
+                    {
+                        <div class="form-group">
+                            <label for="idw-power-input">Distance Power (exponent):</label>
+                            <input id="idw-power-input" type="number" min="0.5" step="0.5" class="form-control" @bind="_idwPower" />
+                        </div>
+                    }
+                    @if (currentTool.Key == "kriging")
+                    {
+                        <div class="form-group">
+                            <label for="variogram-select">Variogram Model:</label>
+                            <select id="variogram-select" class="form-control" @bind="_variogramModel">
+                                <option value="spherical">Spherical</option>
+                                <option value="exponential">Exponential</option>
+                                <option value="gaussian">Gaussian</option>
+                            </select>
+                        </div>
+                    }
+                }
+                else if (currentTool.Key is "shortest_path" or "service_area")
+                {
+                    <div class="form-group">
+                        <label for="start-lng-input">Facility / Start Longitude:</label>
+                        <input id="start-lng-input" type="number" step="0.0001" class="form-control" @bind="_startLng" />
+                    </div>
+                    <div class="form-group">
+                        <label for="start-lat-input">Facility / Start Latitude:</label>
+                        <input id="start-lat-input" type="number" step="0.0001" class="form-control" @bind="_startLat" />
+                    </div>
+                    @if (currentTool.Key == "shortest_path")
+                    {
+                        <div class="form-group">
+                            <label for="end-lng-input">Destination Longitude:</label>
+                            <input id="end-lng-input" type="number" step="0.0001" class="form-control" @bind="_endLng" />
+                        </div>
+                        <div class="form-group">
+                            <label for="end-lat-input">Destination Latitude:</label>
+                            <input id="end-lat-input" type="number" step="0.0001" class="form-control" @bind="_endLat" />
+                        </div>
+                        <div class="form-group">
+                            <label for="algorithm-select">Algorithm:</label>
+                            <select id="algorithm-select" class="form-control" @bind="_algorithm">
+                                <option value="dijkstra">Dijkstra</option>
+                                <option value="astar">A* (haversine heuristic)</option>
+                            </select>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="form-group">
+                            <label for="max-distance-input">Max Network Distance (meters):</label>
+                            <input id="max-distance-input" type="number" min="100" step="100" class="form-control" @bind="_maxDistanceM" />
+                        </div>
+                    }
+                }
+                else if (currentTool.Key == "od_matrix")
+                {
+                    <div class="form-group">
+                        <label for="origins-select">Origins Layer:</label>
+                        <select id="origins-select" class="form-control" @bind="_maskDatasetId">
+                            <option value="">-- Select Origins Layer --</option>
+                            @foreach (var choice in LayerChoices)
+                            {
+                                <option value="@choice.DatasetId">@choice.Label</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="destinations-select">Destinations Layer:</label>
+                        <select id="destinations-select" class="form-control" @bind="_overlayDatasetId">
+                            <option value="">-- Select Destinations Layer --</option>
+                            @foreach (var choice in LayerChoices)
+                            {
+                                <option value="@choice.DatasetId">@choice.Label</option>
+                            }
+                        </select>
+                    </div>
+                }
+                else if (currentTool.Key == "topology_check")
+                {
+                    <div class="form-group">
+                        <label for="rule-select">Topology Rule:</label>
+                        <select id="rule-select" class="form-control" @bind="_overlayOp">
+                            <option value="must_not_overlap">Must Not Overlap (polygons)</option>
+                            <option value="must_not_have_dangles">Must Not Have Dangles (lines)</option>
+                            <option value="must_be_covered_by">Must Be Covered By (points/lines in polygons)</option>
+                        </select>
+                    </div>
+                    @if (_overlayOp == "must_be_covered_by")
+                    {
+                        <div class="form-group">
+                            <label for="cover-select">Covering Polygon Layer:</label>
+                            <select id="cover-select" class="form-control" @bind="_maskDatasetId">
+                                <option value="">-- Select Covering Layer --</option>
+                                @foreach (var choice in PolygonChoices)
+                                {
+                                    <option value="@choice.DatasetId">@choice.Label</option>
+                                }
+                            </select>
+                        </div>
+                    }
+                }
+                else if (currentTool.Key == "join_csv")
+                {
+                    <div class="form-group">
+                        <label for="key-field-input">Layer Key Field:</label>
+                        <input id="key-field-input" class="form-control" placeholder="e.g. district_id" @bind="_keyField" />
+                    </div>
+                    <div class="form-group">
+                        <label for="csv-key-input">CSV Key Column:</label>
+                        <input id="csv-key-input" class="form-control" placeholder="e.g. id" @bind="_csvKey" />
+                    </div>
+                    <div class="form-group">
+                        <label for="csv-text-input">CSV Content (header row + records):</label>
+                        <textarea id="csv-text-input" class="form-control" rows="6" style="font-family: var(--font-mono); font-size: 10.5px;"
+                                  placeholder="id,population&#10;D001,125000&#10;D002,98000" @bind="_csvText"></textarea>
+                    </div>
+                }
+                else if (IsRasterTool(currentTool.Key))
+                {
+                    <div class="form-group">
+                        <label for="raster-select">Raster Grid (.tif imported via Add Layer):</label>
+                        <select id="raster-select" class="form-control" @bind="_rasterId">
+                            <option value="">-- Select Raster --</option>
+                            @foreach (var raster in State.Rasters)
+                            {
+                                <option value="@raster.Id">@raster.Name (@raster.Width×@raster.Height · @raster.CellSizeM m)</option>
+                            }
+                        </select>
+                        @if (State.Rasters.Count == 0)
+                        {
+                            <span class="form-hint">Import an uncompressed single-band GeoTIFF via <strong>Add Layer</strong> to enable raster analysis.</span>
+                        }
+                    </div>
+                    @if (currentTool.Key == "hillshade")
+                    {
+                        <div class="form-group">
+                            <label for="azimuth-input">Light Azimuth (°):</label>
+                            <input id="azimuth-input" type="number" min="0" max="360" class="form-control" @bind="_azimuth" />
+                        </div>
+                        <div class="form-group">
+                            <label for="altitude-input">Light Altitude (°):</label>
+                            <input id="altitude-input" type="number" min="0" max="90" class="form-control" @bind="_altitude" />
+                        </div>
+                    }
+                    @if (currentTool.Key == "raster_calculator")
+                    {
+                        <div class="form-group">
+                            <label for="expression-input">Expression (a = first raster, b = second):</label>
+                            <input id="expression-input" class="form-control" style="font-family: var(--font-mono);" placeholder="e.g. a * 2 + 1  ·  sqrt(a) / max(a, b)" @bind="_expression" />
+                        </div>
+                        <div class="form-group">
+                            <label for="raster-b-select">Second Raster (optional, for 'b'):</label>
+                            <select id="raster-b-select" class="form-control" @bind="_secondRasterId">
+                                <option value="">-- None --</option>
+                                @foreach (var raster in State.Rasters)
+                                {
+                                    <option value="@raster.Id">@raster.Name</option>
+                                }
+                            </select>
+                        </div>
+                    }
+                    @if (currentTool.Key == "zonal_stats")
+                    {
+                        <div class="form-group">
+                            <label for="zones-select">Polygon Zones Layer:</label>
+                            <select id="zones-select" class="form-control" @bind="_maskDatasetId">
+                                <option value="">-- Select Zones Layer --</option>
+                                @foreach (var choice in PolygonChoices)
+                                {
+                                    <option value="@choice.DatasetId">@choice.Label</option>
+                                }
+                            </select>
+                        </div>
+                    }
+                    @if (currentTool.Key == "viewshed")
+                    {
+                        <div class="form-group">
+                            <label for="obs-lng-input">Observer Longitude:</label>
+                            <input id="obs-lng-input" type="number" step="0.0001" class="form-control" @bind="_observerLng" />
+                        </div>
+                        <div class="form-group">
+                            <label for="obs-lat-input">Observer Latitude:</label>
+                            <input id="obs-lat-input" type="number" step="0.0001" class="form-control" @bind="_observerLat" />
+                        </div>
+                        <div class="form-group">
+                            <label for="obs-height-input">Observer Height (m):</label>
+                            <input id="obs-height-input" type="number" min="0" step="1" class="form-control" @bind="_observerHeight" />
+                        </div>
+                    }
+                }
 
                 <div style="margin-top: auto; padding-top: var(--space-4); display: flex; gap: var(--space-2);">
-                    <button class="btn btn-primary" style="flex: 1; padding: 8px 14px;" @onclick="Execute" disabled="@(_isRunning || string.IsNullOrEmpty(_datasetId))" aria-label="Execute Calculation">
+                    <button class="btn btn-primary" style="flex: 1; padding: 8px 14px;" @onclick="Execute"
+                            disabled="@(_isRunning || !CanExecute)" aria-label="Execute Calculation">
                         @if (_isRunning)
                         {
                             <span class="geoviz-spinner" style="width: 14px; height: 14px;"></span>
@@ -339,6 +568,34 @@
     private string _filterValue = "0";
     private int _pointCount = 100;
 
+    // Spatial statistics / geostatistics drafts
+    private string _statField = "";
+    private string _explanatoryCsv = "";
+    private double? _bandMeters;
+    private double _statCellSizeKm = 20;
+    private int _statMaxNeighbors = 12;
+    private double _idwPower = 2;
+    private string _variogramModel = "spherical";
+
+    // Network drafts
+    private double _startLng, _startLat, _endLng, _endLat;
+    private string _algorithm = "dijkstra";
+    private double _maxDistanceM = 10000;
+
+    // Join drafts
+    private string _keyField = "";
+    private string _csvKey = "";
+    private string _csvText = "";
+
+    // Raster drafts
+    private string _rasterId = "";
+    private string _secondRasterId = "";
+    private string _expression = "a * 1.0";
+    private double _azimuth = 315;
+    private double _altitude = 45;
+    private double _observerLng, _observerLat;
+    private double _observerHeight = 10;
+
     private bool _isRunning;
     private bool _isAdding;
     private bool _justAdded;
@@ -348,7 +605,6 @@
     protected override void OnInitialized()
     {
         State.Changed += OnStateChanged;
-        ConsumeQueuedTarget();
         EnsureSelection();
     }
 
@@ -356,7 +612,6 @@
 
     private void OnStateChanged()
     {
-        ConsumeQueuedTarget();
         EnsureSelection();
         if (State.LastResult != null && !ReferenceEquals(State.LastResult, _lastResult))
         {
@@ -384,15 +639,6 @@
         if (ds is null) return null;
         var isPolygon = ds.GeomTypes.Any(t => t is "Polygon" or "MultiPolygon");
         return new LayerChoice(ds.Id, $"{l.Name} · {ds.FeatureCount:N0} feats", isPolygon);
-    }
-
-    private void ConsumeQueuedTarget()
-    {
-        if (State.ConsumePendingCalculation() is { } queued)
-        {
-            if (LayerChoices.Any(c => c.DatasetId == queued))
-                _datasetId = queued;
-        }
     }
 
     /// <summary>Default to the active map layer; keep selection valid as layers change.</summary>
@@ -446,13 +692,103 @@
         {
             ["filter_dataset_id"] = string.IsNullOrEmpty(_overlayDatasetId) ? null : _overlayDatasetId
         },
+        // --- Spatial statistics ---
+        "morans_i" => new() { ["attribute_field"] = _statField },
+        "getis_ord" => new() { ["attribute_field"] = _statField, ["band_meters"] = _bandMeters },
+        "ols_regression" => new() { ["attribute_field"] = _statField, ["explanatory_csv"] = _explanatoryCsv },
+        "idw" => new()
+        {
+            ["attribute_field"] = _statField,
+            ["idw_power"] = _idwPower,
+            ["cell_size_km"] = _statCellSizeKm,
+            ["max_neighbors"] = _statMaxNeighbors
+        },
+        "kriging" => new()
+        {
+            ["attribute_field"] = _statField,
+            ["variogram_model"] = _variogramModel,
+            ["cell_size_km"] = _statCellSizeKm,
+            ["max_neighbors"] = _statMaxNeighbors
+        },
+        "mean_center" => new(),
+        "median_center" => new(),
+        "directional_mean" => new(),
+        // --- Network ---
+        "shortest_path" => new()
+        {
+            ["start_lng"] = _startLng, ["start_lat"] = _startLat,
+            ["end_lng"] = _endLng, ["end_lat"] = _endLat,
+            ["algorithm"] = _algorithm
+        },
+        "service_area" => new()
+        {
+            ["start_lng"] = _startLng, ["start_lat"] = _startLat,
+            ["max_distance_m"] = _maxDistanceM
+        },
+        "od_matrix" => new()
+        {
+            ["filter_dataset_id"] = string.IsNullOrEmpty(_maskDatasetId) ? null : _maskDatasetId,
+            ["target_dataset_id"] = string.IsNullOrEmpty(_overlayDatasetId) ? null : _overlayDatasetId
+        },
+        // --- Topology & joins ---
+        "topology_check" => new()
+        {
+            ["operation"] = _overlayOp,
+            ["filter_dataset_id"] = string.IsNullOrEmpty(_maskDatasetId) ? null : _maskDatasetId
+        },
+        "join_csv" => new()
+        {
+            ["key_field"] = _keyField.Trim(),
+            ["csv_key"] = string.IsNullOrWhiteSpace(_csvKey) ? _keyField.Trim() : _csvKey.Trim(),
+            ["csv_text"] = _csvText
+        },
+        // --- Raster (Spatial Analyst) ---
+        "slope" => new() { ["raster_id"] = RasterArg },
+        "hillshade" => new() { ["raster_id"] = RasterArg, ["azimuth"] = _azimuth, ["altitude"] = _altitude },
+        "raster_calculator" => new()
+        {
+            ["raster_id"] = RasterArg,
+            ["expression"] = _expression,
+            ["second_raster_id"] = string.IsNullOrEmpty(_secondRasterId) ? null : _secondRasterId
+        },
+        "d8_flow" => new() { ["raster_id"] = RasterArg },
+        "zonal_stats" => new()
+        {
+            ["raster_id"] = RasterArg,
+            ["filter_dataset_id"] = string.IsNullOrEmpty(_maskDatasetId) ? null : _maskDatasetId
+        },
+        "viewshed" => new()
+        {
+            ["raster_id"] = RasterArg,
+            ["observer_lng"] = _observerLng, ["observer_lat"] = _observerLat,
+            ["observer_height_m"] = _observerHeight
+        },
         _ => new()
     };
+
+    private static bool IsRasterTool(string key) =>
+        key is "slope" or "hillshade" or "raster_calculator" or "d8_flow" or "zonal_stats" or "viewshed";
+
+    /// <summary>Raster tools need a raster; vector tools need a layer.</summary>
+    private bool CanExecute =>
+        !_isRunning && (IsRasterTool(State.ActiveTab?.ActiveTool ?? "")
+            ? !string.IsNullOrEmpty(_rasterId)
+            : !string.IsNullOrEmpty(_datasetId));
+
+    /// <summary>Raster tools don't take a vector input; disable the layer selector for them.</summary>
+    private string? RasterArg => string.IsNullOrEmpty(_rasterId) ? null : _rasterId;
+
+    /// <summary>Numeric schema fields of the selected input layer (statistics candidates).</summary>
+    private List<string> InputSchemaFields =>
+        (State.GetCachedDataset(_datasetId)?.PropertiesSchema ?? new List<GeoViz.Models.FieldSchema>())
+        .Where(f => f.FieldType is "number" or "integer" || double.TryParse(f.SampleValue, out _))
+        .Select(f => f.Name)
+        .ToList();
 
     private async Task Execute()
     {
         var tab = State.ActiveTab;
-        if (tab is null || string.IsNullOrEmpty(_datasetId) || _isRunning) return;
+        if (tab is null || !CanExecute) return;
 
         _isRunning = true;
         _runError = null;

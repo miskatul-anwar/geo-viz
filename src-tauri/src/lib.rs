@@ -29,6 +29,9 @@ pub fn run() {
             // Ingestion & provisioning
             commands::import_dataset,
             commands::add_result_layer,
+            commands::import_raster,
+            commands::list_rasters,
+            commands::delete_raster,
             // Datasets
             commands::save_dataset,
             commands::list_datasets,
@@ -59,6 +62,30 @@ pub fn run() {
             commands::run_overlay_tool,
             commands::run_dissolve_tool,
             commands::run_spatial_join_tool,
+            // Spatial statistics
+            commands::run_mean_center_tool,
+            commands::run_median_center_tool,
+            commands::run_directional_mean_tool,
+            commands::run_morans_i_tool,
+            commands::run_getis_ord_tool,
+            commands::run_ols_tool,
+            // Geostatistics
+            commands::run_idw_tool,
+            commands::run_kriging_tool,
+            // Network
+            commands::run_shortest_path_tool,
+            commands::run_service_area_tool,
+            commands::run_od_matrix_tool,
+            // Topology & joins
+            commands::run_topology_tool,
+            commands::run_join_csv_tool,
+            // Raster (Spatial Analyst)
+            commands::run_slope_tool,
+            commands::run_hillshade_tool,
+            commands::run_raster_calculator_tool,
+            commands::run_d8_tool,
+            commands::run_zonal_stats_tool,
+            commands::run_viewshed_tool,
             // Calculation history
             commands::list_calculation_history,
             // Symbology

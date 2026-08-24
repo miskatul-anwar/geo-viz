@@ -42,8 +42,30 @@ window.geoVizMap = {
             fill: shapeType !== 'line',
             // Attribute-driven symbology (backend-computed class breaks)
             classification: s.classification || null,
-            labelField: s.label_field || s.labelField || null
+            labelField: s.label_field || s.labelField || null,
+            // Cartographic blending (QGIS parity): composited per layer pane
+            blendMode: s.blend_mode || s.blendMode || null
         };
+    },
+
+    // The QGIS blending modes, executed by the browser compositor via CSS.
+    BLEND_MODES: ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten',
+        'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference',
+        'exclusion', 'hue', 'saturation', 'color', 'luminosity'],
+
+    // Dedicated pane per blended layer so mix-blend-mode composites only
+    // that layer against everything below it.
+    paneForBlend: function (layerId, blendMode) {
+        const mode = this.BLEND_MODES.includes(blendMode) && blendMode !== 'normal' ? blendMode : null;
+        if (!mode) return undefined;
+        const paneName = 'blend-' + layerId;
+        let pane = this.map.getPane(paneName);
+        if (!pane) {
+            pane = this.map.createPane(paneName);
+            pane.style.zIndex = 450;
+        }
+        pane.style.mixBlendMode = mode;
+        return paneName;
     },
 
     // Match a feature's numeric attribute value against class breaks
@@ -196,8 +218,10 @@ window.geoVizMap = {
 
         const self = this;
         const st = this.resolveStyle(style, opacity);
+        const blendPane = this.paneForBlend(layerId, st.blendMode);
 
         const geoLayer = L.geoJSON(geoJsonData, {
+            pane: blendPane,
             style: function (feature) {
                 const classColor = this.classColorFor(st.classification, feature && feature.properties);
                 return {
@@ -261,7 +285,8 @@ window.geoVizMap = {
 
                 layer.on('click', function (e) {
                     if (self.dotNetRef && !self.activeMeasureMode) {
-                        self.dotNetRef.invokeMethodAsync('OnFeatureSelected', layerId, JSON.stringify(feature.properties || {}));
+                        const featureIndex = (geoJsonData.features || []).indexOf(feature);
+                        self.dotNetRef.invokeMethodAsync('OnFeatureSelected', layerId, featureIndex, JSON.stringify(feature.properties || {}));
                     }
                 });
             }
@@ -518,5 +543,15 @@ window.geoVizMap = {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }, 100);
+    }
+};
+
+// Attribute-table helpers: reveal a row inside the virtualized grid.
+window.geoVizTable = {
+    revealRow: function (index) {
+        const el = document.querySelector('tr[data-row-index="' + index + '"]');
+        if (el) {
+            el.scrollIntoView({ block: 'nearest' });
+        }
     }
 };

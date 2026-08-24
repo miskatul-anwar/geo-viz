@@ -31,7 +31,7 @@
             @if (ImportFormatMode != "text")
             {
                 <div class="file-upload-dropzone" style="position: relative; padding: 22px 16px;">
-                    <InputFile OnChange="HandleFileSelected" accept=".geojson,.json,.txt,.shp,.zip,.kml,.kmz,.gpx,.gpkg" id="spatial-file-input" class="hidden-file-input" />
+                    <InputFile OnChange="HandleFileSelected" accept=".geojson,.json,.txt,.shp,.zip,.kml,.kmz,.gpx,.gpkg,.tif,.tiff" id="spatial-file-input" class="hidden-file-input" />
                     <div class="file-drop-label">
                         <div style="margin-bottom: 6px;">
                             <LucideIcon Name="upload" Size="28" Color="var(--accent)" />
@@ -49,7 +49,7 @@
                         else
                         {
                             <span style="font-weight: 700; color: var(--text-primary); font-size: 12px;">Click to Browse or Drag &amp; Drop Spatial File</span>
-                            <span style="font-size: 10.5px; color: var(--text-secondary); margin-top: 3px;">Supports <strong>.geojson</strong> <strong>.kml/.kmz</strong> <strong>.gpx</strong> <strong>.gpkg</strong> and <strong>.shp/.zip</strong> up to 100MB</span>
+                            <span style="font-size: 10.5px; color: var(--text-secondary); margin-top: 3px;">Supports <strong>.geojson</strong> <strong>.kml/.kmz</strong> <strong>.gpx</strong> <strong>.gpkg</strong> <strong>.shp/.zip</strong> and <strong>.tif/.tiff</strong> (raster) up to 100MB</span>
                         }
                     </div>
                 </div>
@@ -117,7 +117,7 @@
     private string GeoJsonText { get; set; } = string.Empty;
     private string RawBase64Data { get; set; } = string.Empty;
     private string SourceFormat { get; set; } = "geojson";
-    private static readonly string[] BinaryFormats = { "shapefile", "kmz", "gpkg" };
+    private static readonly string[] BinaryFormats = { "shapefile", "kmz", "gpkg", "geotiff" };
     private bool IsBinaryFormat => BinaryFormats.Contains(SourceFormat);
     private string FormatLabel => SourceFormat switch
     {
@@ -126,6 +126,7 @@
         "kmz" => "KMZ (Zipped KML)",
         "gpx" => "GPX Track",
         "gpkg" => "GeoPackage",
+        "geotiff" => "GeoTIFF Raster",
         _ => "GeoJSON"
     };
     private string? UploadedFileName { get; set; }
@@ -262,7 +263,14 @@
 
         try
         {
-            await State.ImportAsync(name, payload, SourceFormat);
+            if (SourceFormat == "geotiff")
+            {
+                await State.ImportRasterAsync(name, payload);
+            }
+            else
+            {
+                await State.ImportAsync(name, payload, SourceFormat);
+            }
             if (OnClose.HasDelegate)
                 await OnClose.InvokeAsync();
         }
@@ -282,6 +290,7 @@
         ".gpx" => "gpx",
         ".gpkg" => "gpkg",
         ".geojson" or ".json" or ".txt" => "geojson",
+        ".tif" or ".tiff" => "geotiff",
         _ => isBinary ? "shapefile" : "geojson"
     };
 

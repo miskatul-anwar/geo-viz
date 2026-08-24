@@ -107,6 +107,17 @@ public sealed class TauriService
     public Task<List<CalculationRun>> ListCalculationHistoryAsync(int limit = 15) =>
         InvokeAsync<List<CalculationRun>>("list_calculation_history", new { limit });
 
+    // Rasters (Spatial Analyst inputs)
+
+    public Task<RasterSummary> ImportRasterAsync(string? name, string tiffBase64) =>
+        InvokeAsync<RasterSummary>("import_raster", new { name, tiff_base64 = tiffBase64 });
+
+    public Task<List<RasterSummary>> ListRastersAsync() =>
+        InvokeAsync<List<RasterSummary>>("list_rasters");
+
+    public Task<bool> DeleteRasterAsync(string id) =>
+        InvokeAsync<bool>("delete_raster", new { id });
+
     // Geoprocessing tools: one generic dispatch point; argument construction
     // and tool selection live in AppState.RunToolAsync.
 

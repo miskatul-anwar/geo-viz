@@ -16,39 +16,66 @@
 
 ---
 
-GeoViz is a cross-platform **desktop GIS application** for ingesting, visualizing, analyzing and converting vector geodata. Heavy lifting — parsing, geoprocessing, classification, persistence — happens in a native Rust engine; the interface is a fast, sandboxed web view. No telemetry, no accounts, no cloud: your data never leaves your machine.
+GeoViz is a cross-platform **desktop GIS application** for ingesting, visualizing, analyzing and converting geodata — vector **and** raster. Heavy lifting — parsing, geoprocessing, spatial statistics, interpolation, network routing, raster algebra — happens in a native Rust engine; the interface is a fast, sandboxed web view. No telemetry, no accounts, no cloud: your data never leaves your machine.
 
 ## ✨ Features
 
 **Data ingestion**
-| Format | Read | Notes |
+| Format | Kind | Notes |
 |---|---|---|
-| GeoJSON / JSON | ✅ | Text or paste |
-| ESRI Shapefile (.shp / .zip) | ✅ | Binary + zipped archives |
-| KML | ✅ | Placemarks, ExtendedData, MultiGeometry |
-| KMZ (zipped KML) | ✅ | |
-| GPX | ✅ | Waypoints, tracks, routes |
-| GeoPackage (.gpkg) | ✅ | GPKG blob/WKB decoding built in |
-| WKT / CSV | ✅ | Via the Format Converter |
+| GeoJSON / JSON | Vector | Text or paste |
+| ESRI Shapefile (.shp / .zip) | Vector | Binary + zipped archives |
+| KML | Vector | Placemarks, ExtendedData, MultiGeometry |
+| KMZ (zipped KML) | Vector | |
+| GPX | Vector | Waypoints, tracks, routes |
+| GeoPackage (.gpkg) | Vector | GPKG blob/WKB decoding built in |
+| GeoTIFF (.tif / .tiff) | Raster | Uncompressed single-band grids for the Spatial Analyst tools |
+| WKT / CSV | Vector | Via the Format Converter |
 
 **Map studio**
 - Leaflet canvas with Dark / Light / OSM / Satellite / Topo basemaps
 - Per-layer styling: fill/stroke colors, opacity, stroke width, point radius, shape rendering mode
 - **Categorized & graduated symbology** — equal-interval or quantile class breaks computed by the Rust engine
 - **Attribute labeling** rendered directly on the map
+- **16 blending modes** (multiply, screen, overlay, difference, …) — QGIS-style layer compositing
 - Distance & area measurement tools
 - **Spatial bookmarks** (persisted map views)
 - Live coordinate readout, layer TOC with visibility toggles
-- Attribute table: virtualized for large datasets, search, sorting, column statistics, CSV export
+- Attribute table: virtualized for large datasets, search, sorting, column statistics, CSV export, and **bidirectional map↔table selection** (click a feature → its row highlights; click a row → zoom to the feature)
 
-**Geoprocessing toolbox** (all executed natively in Rust)
+**Geoprocessing toolbox** (32 tools, all executed natively in Rust)
+
+*Fundamental analysis*
 - Buffer analysis · Convex hull · Centroids · Bounding boxes
 - Douglas-Peucker simplification · Spherical area/perimeter metrics
 - Spatial query (polygon containment + attribute filters) · Hexbin/square density binning
 - Nearest-neighbor distance matrix · Random point sampling
 - **Overlay analysis**: Intersection, Difference, Symmetric difference, Clip
 - **Dissolve / Union** (optionally grouped by attribute)
-- **Spatial join** (attach attributes by location)
+- **Spatial join** (attach attributes by location) · **CSV attribute join** (attach columns by key)
+
+*Spatial statistics*
+- Mean & median center (Weiszfeld iteration) · Linear directional mean
+- **Global Moran's I** spatial autocorrelation (z-score + p-value)
+- **Getis-Ord Gi\* hot spot analysis** (adaptive distance band, 95%/99% significance classes)
+- **OLS regression** (up to 6 explanatory fields, R²/adj-R²/AIC, per-feature residuals)
+
+*Geostatistics*
+- **IDW interpolation** (power + neighbor controls)
+- **Ordinary Kriging** with spherical/exponential/gaussian semivariogram autofit — prediction **and** standard-error surfaces
+
+*Network analysis*
+- **Shortest path** via Dijkstra or A* (haversine heuristic) over endpoint-snapped line graphs
+- **Service areas** (network isochrones with hull) · **OD cost matrices**
+
+*Data integrity*
+- **Topology validation**: `must_not_overlap`, `must_not_have_dangles`, `must_be_covered_by` — violations render as a layer with suggested fixes
+
+**Spatial Analyst (raster)**
+- Horn **slope** & **aspect** · Lambertian **hillshade** (configurable azimuth/altitude)
+- **Raster calculator** (map algebra: `+ - * /`, `sqrt/log/abs/min/max`, two rasters)
+- **D8 flow direction & accumulation** · **Viewshed** (line-of-sight visibility)
+- **Zonal statistics** (min/max/mean/median/std/majority per polygon)
 
 **Utilities**
 - SQL console over the embedded project database (read-only guardrails)
@@ -60,14 +87,18 @@ GeoViz is a cross-platform **desktop GIS application** for ingesting, visualizin
 | Capability | GeoViz | QGIS | ArcGIS Pro |
 |---|---|---|---|
 | License | MIT, free forever | GPL, free | Proprietary, paid |
-| Footprint | ~15 MB installed | > 1 GB | > 5 GB |
+| Footprint | ~20 MB installed | > 1 GB | > 5 GB |
 | Vector formats in/out | Core set (see above) | Hundreds via GDAL | Hundreds via GDAL |
 | Vector overlay/geoprocessing | ✅ | ✅ | ✅ |
-| Raster analysis | ❌ planned | ✅ | ✅ |
+| Spatial statistics (Moran's I, Gi\*, OLS) | ✅ | ✅ | ✅ |
+| Interpolation (IDW, Kriging) | ✅ | ✅ | ✅ |
+| Network routing (shortest path, service areas) | ✅ | ✅ | ✅ |
+| Raster analysis (slope, hillshade, algebra, D8) | ✅ | ✅ | ✅ |
+| Layer blending modes | ✅ (16) | ✅ (13) | ⚠️ subset |
 | Coordinate reprojection | ❌ planned (EPSG:4326 today) | ✅ | ✅ |
 | Offline / privacy-first | ✅ | ✅ | ⚠️ telemetry |
 
-*GeoViz is intentionally small: it aims to cover the 20% of GIS operations that 80% of users need daily — not to replace full GDAL/OGR stacks.*
+*GeoViz aims to cover the analytical core of the big GIS platforms as a single small, offline binary. See [docs/SPEC-COMPLIANCE.md](docs/SPEC-COMPLIANCE.md) for the detailed capability matrix, implementation limits and roadmap.*
 
 ## 📦 Install
 
@@ -102,8 +133,8 @@ cargo tauri dev
 Run the test suites:
 
 ```bash
-cargo test --manifest-path src-tauri/Cargo.toml   # 24 backend tests
-dotnet test src/GeoViz.csproj                     # frontend builds validated in CI
+cargo test --manifest-path src-tauri/Cargo.toml   # 56 backend tests (algorithms + services)
+dotnet build src/GeoViz.csproj                    # frontend build validated in CI
 ```
 
 ## 🏗 Architecture
@@ -119,22 +150,26 @@ dotnet test src/GeoViz.csproj                     # frontend builds validated in
 ┌────────────────▼──────────────────────────────▼─────────────────────────────────┐
 │                       Native engine (Rust — heavy layer)                        │
 │  commands.rs (thin adapters) → services/ (import, tools) → gis/ (pure algos)    │
-│  db.rs: SQLite (WAL) — datasets, layers, tabs, history, bookmarks               │
+│  gis/: vector geoprocessing · spatial statistics · geostatistics · network ·    │
+│         topology · raster (GeoTIFF) · joins · classification                    │
+│  db.rs: SQLite (WAL) — datasets, layers, rasters, tabs, history, bookmarks      │
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 Design rules: high cohesion per module, low coupling across layers, all orchestration server-side (in-app), typed errors end-to-end, zero business logic in the UI.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for details and [docs/SPEC-COMPLIANCE.md](docs/SPEC-COMPLIANCE.md) for the feature-compliance matrix.
 
 ## 🗺 Roadmap
 
+- [ ] Compressed/tiled GeoTIFF (LZW, Deflate) + NetCDF/HDF5 drivers
+- [ ] Geographically Weighted Regression & Empirical Bayesian Kriging
+- [ ] Watershed delineation on the D8 primitives
 - [ ] Field calculator (expression-driven attribute computation)
-- [ ] GeoJSON/KML export from layers panel
-- [ ] Web Mercator reprojection on import/export
+- [ ] Web Mercator / UTM reprojection on import/export
 - [ ] Print layout / map image export
-- [ ] Raster tile overlays (XYZ)
-- [ ] Plugin surface for community geoprocessing tools
+- [ ] Directed networks: one-way streets & turn penalties
+- [ ] Python automation surface over the IPC commands
 
 Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 

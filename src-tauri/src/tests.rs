@@ -846,4 +846,108 @@ mod tests {
         assert!(db.delete_bookmark("bm-1").await.unwrap());
         assert!(db.list_bookmarks().await.unwrap().is_empty());
     }
+
+    #[tokio::test]
+    async fn test_raster_import_and_slope_tool() {
+        let temp_dir = std::env::temp_dir().join(format!("geoviz_test_{}", uuid::Uuid::new_v4()));
+        let db = AppDb::init(Some(temp_dir)).await.expect("DB init failed");
+
+        // Minimal 4x4 uncompressed 16-bit LE TIFF.
+        let mut tiff: Vec<u8> = Vec::new();
+        tiff.extend_from_slice(b"II");
+        tiff.extend_from_slice(&42u16.to_le_bytes());
+        tiff.extend_from_slice(&8u32.to_le_bytes());
+        let entries: Vec<(u16, u16, u32, [u8; 4])> = vec![
+            (256, 3, 1, [4, 0, 0, 0]),
+            (257, 3, 1, [4, 0, 0, 0]),
+            (258, 3, 1, [16, 0, 0, 0]),
+            (259, 3, 1, [1, 0, 0, 0]),
+            (273, 4, 1, {
+                let off = (8 + 2 + 7 * 12 + 4) as u8;
+                [off, 0, 0, 0]
+            }),
+            (277, 3, 1, [1, 0, 0, 0]),
+            (279, 4, 1, [32, 0, 0, 0]),
+        ];
+        tiff.extend_from_slice(&(entries.len() as u16).to_le_bytes());
+        for (tag, typ, count, value) in &entries {
+            tiff.extend_from_slice(&tag.to_le_bytes());
+            tiff.extend_from_slice(&typ.to_le_bytes());
+            tiff.extend_from_slice(&count.to_le_bytes());
+            tiff.extend_from_slice(value);
+        }
+        tiff.extend_from_slice(&0u32.to_le_bytes());
+        for i in 0..16u16 {
+            tiff.extend_from_slice(&((i % 4) * 100).to_le_bytes());
+        }
+
+        let summary =
+            crate::services::tool_service::import_raster(&db, Some("test.tif".into()), &tiff)
+                .await
+                .expect("raster import failed");
+        assert_eq!(summary.width, 4);
+        assert_eq!(summary.height, 4);
+
+        let result = crate::services::tool_service::run_tool(
+            &db,
+            crate::services::tool_service::ToolKind::Slope,
+            crate::services::tool_service::ToolParams {
+                raster_id: Some(summary.id.clone()),
+                ..Default::default()
+            },
+            None,
+            None,
+            "tab-1".to_string(),
+        )
+        .await
+        .expect("slope tool failed");
+        assert_eq!(result.feature_count, 16);
+        assert!(result.summary_metrics.get("mean").is_some());
+
+        let rasters = db.list_rasters().await.expect("list rasters failed");
+        assert_eq!(rasters.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_spatial_statistics_end_to_end() {
+        let temp_dir = std::env::temp_dir().join(format!("geoviz_test_{}", uuid::Uuid::new_v4()));
+        let db = AppDb::init(Some(temp_dir)).await.expect("DB init failed");
+
+        let outcome = crate::services::dataset_service::import_dataset(
+            &db,
+            None,
+            &sample_geojson_text(),
+            "geojson",
+        )
+        .await
+        .expect("import failed");
+
+        let result = crate::services::tool_service::run_tool(
+            &db,
+            crate::services::tool_service::ToolKind::MeanCenter,
+            Default::default(),
+            Some(outcome.dataset.id.clone()),
+            None,
+            "tab-1".to_string(),
+        )
+        .await
+        .expect("mean center failed");
+        assert_eq!(result.feature_count, 1);
+        assert!(result.summary_metrics.get("center_lng").is_some());
+
+        let topology = crate::services::tool_service::run_tool(
+            &db,
+            crate::services::tool_service::ToolKind::TopologyCheck,
+            crate::services::tool_service::ToolParams {
+                operation: Some("must_not_overlap".into()),
+                ..Default::default()
+            },
+            Some(outcome.dataset.id),
+            None,
+            "tab-1".to_string(),
+        )
+        .await;
+        // Sample data is points; overlap rule requires polygons and must fail cleanly.
+        assert!(topology.is_err());
+    }
 }

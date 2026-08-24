@@ -94,6 +94,9 @@ public class LayerStyle
     /// <summary>Optional attribute rendered as a map label.</summary>
     [JsonPropertyName("label_field")]
     public string? LabelField { get; set; }
+
+    [JsonPropertyName("blend_mode")]
+    public string? BlendMode { get; set; }
 }
 
 public class ClassBreak
@@ -258,4 +261,28 @@ public class SqlQueryResult
 
     [JsonPropertyName("execution_time_ms")]
     public long ExecutionTimeMs { get; set; }
+}
+
+public class RasterSummary
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("width")]
+    public int Width { get; set; }
+
+    [JsonPropertyName("height")]
+    public int Height { get; set; }
+
+    [JsonPropertyName("cell_size_m")]
+    public double CellSizeM { get; set; }
+
+    [JsonPropertyName("bbox")]
+    public List<double> Bbox { get; set; } = new();
+
+    [JsonPropertyName("created_at")]
+    public string CreatedAt { get; set; } = string.Empty;
 }

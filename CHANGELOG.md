@@ -5,6 +5,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-08-24
+
+Major release: **offline GIS toolbox parity** — the analytical toolboxes mandated by the specification sheet (`GIS Clone Specification Sheet.md`), with a full compliance matrix in `docs/SPEC-COMPLIANCE.md`. The tool catalog grows from 13 to 32 tools; backend test suite grows from 24 to 56.
+
+### Added — Specification compliance release (offline GIS toolbox parity)
+
+- **Spatial Statistics toolbox**: mean center, median center (Weiszfeld), linear directional mean, Global Moran's I (z/p significance), Getis-Ord Gi* hot spot analysis (adaptive distance band, 95%/99% classes), and OLS regression (≤6 regressors, R²/adj-R²/AIC, per-feature residual layer).
+- **Geostatistical Analyst**: IDW interpolation and Ordinary Kriging with spherical/exponential/gaussian semivariogram autofit — kriging emits prediction **and standard-error** surfaces.
+- **Network Analyst**: topological graph construction from line layers (endpoint snapping), Dijkstra and A* shortest paths, service-area isochrones (reachable edges + hull), and origin-destination cost matrices.
+- **Topology engine**: `must_not_overlap`, `must_not_have_dangles` and `must_be_covered_by` rules producing a violations layer with machine-actionable `suggested_fix` attributes.
+- **Spatial Analyst (raster)**: uncompressed single-band GeoTIFF ingestion (stored in a new `rasters` table), Horn slope & aspect, Lambertian hillshade, map-algebra raster calculator (`+ - * /`, `sqrt/log/abs/min/max`, two rasters), D8 flow direction + flow accumulation, polygon zonal statistics (min/max/mean/median/std/majority), and Bresenham viewshed. Import `.tif/.tiff` via Add Layer.
+- **Attribute joins**: paste-a-CSV table join by primary key with `join_*` column prefixing.
+- **Cartography**: all QGIS blending modes (multiply, screen, overlay, …, luminosity) executed per layer via dedicated compositor panes.
+- **Table ↔ map bidirectional selection**: clicking a map feature highlights and reveals its row in the (already virtualized) attribute table; clicking a row still zooms to the feature.
+
+### Fixed
+- **Layer visibility toggle**: unchecking and re-checking a layer left it permanently invisible — the map-sync signature was not recorded when hiding, so the identical signature on re-check skipped the rebuild. Hidden state is now recorded, restoring the toggle cycle.
+- **Layer symbology inputs ignored user choices**: the Classes field/method/count were a single shared draft across all layers, so each layer's panel pre-showed another layer's selection (or the default option when the field was absent from that layer's schema) and Apply could silently use stale values. Drafts are now per-layer.
+- **Classification overwrote the user's fill color** with a hardcoded neutral; the base color is now preserved (classified features are still colored per-class).
+- **Label/class dropdowns could render with only the default option** when the dataset schema wasn't loaded yet; expanding symbology now resolves the schema on demand.
+
+### Removed
+- **Layer Matrix view**: redundant with the layer manager and calculator input selectors; the cross-view intent queue (`QueueCalculationFor`/`ConsumePendingCalculation`) it existed to serve was removed with it.
+
 ## [2.0.0] - 2026-08-24
 
 Major release focused on **UI/UX quality and structural discipline**.

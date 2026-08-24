@@ -1,4 +1,4 @@
-/* GeoViz — calculations: tool selector, config, metrics, matrix */
+/* GeoViz — calculations: tool selector, config, metrics, results */
 /* Multi-Tab Calculation Engine Styles */
 .calc-workspace-container {
   flex: 1 1 0%;
@@ -297,46 +297,6 @@
   font-family: var(--font-mono);
   font-size: 10px;
   color: var(--text-muted);
-}
-
-/* Layer matrix view */
-.matrix-view {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4) var(--space-5);
-  max-width: 1400px;
-  width: 100%;
-  margin: 0 auto;
-}
-.matrix-header p { font-size: 11px; }
-.matrix-scroll { flex: 1; min-height: 0; overflow: auto; }
-.matrix-table td, .matrix-table th { padding: 6px 10px; }
-.matrix-table .num { font-family: var(--font-mono); text-align: right; }
-.matrix-table .mono { font-family: var(--font-mono); font-size: 10.5px; }
-.matrix-table .small, .matrix-footer { font-size: 10px; color: var(--text-muted); }
-.matrix-table .layer-color-dot {
-  display: inline-block;
-  width: 10px; height: 10px;
-  border-radius: 3px;
-  margin-right: 6px;
-  vertical-align: middle;
-}
-.matrix-empty {
-  flex: 1;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  gap: var(--space-1);
-  color: var(--text-muted); text-align: center;
-}
-.matrix-empty h3 { font-size: 13px; color: var(--text-secondary); margin: 8px 0 0; }
-.matrix-empty p { font-size: 11px; max-width: 340px; line-height: 1.5; }
-.matrix-footer {
-  display: flex; justify-content: space-between;
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--border-subtle);
 }
 
 /* Result preview table (calculation outputs) */
