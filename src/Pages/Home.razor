@@ -82,6 +82,23 @@
         await State.InitializeAsync();
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        // Restore the persisted UI theme so the toggle reflects reality.
+        try
+        {
+            var theme = await JsRuntime.InvokeAsync<string>("geoVizMap.getUiTheme");
+            IsDarkTheme = theme != "light";
+            await InvokeAsync(StateHasChanged);
+        }
+        catch
+        {
+            /* default dark; best-effort */
+        }
+    }
+
     private void OnStateChanged()
     {
         _ = InvokeAsync(StateHasChanged);

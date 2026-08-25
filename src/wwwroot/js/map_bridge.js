@@ -141,8 +141,15 @@ window.geoVizMap = {
             "topo": topo
         };
 
-        const activeBase = savedTheme === 'light' ? lightCarto : darkCarto;
-        activeBase.addTo(this.map);
+        // Basemap: restore the persisted choice (independent of UI theme);
+        // first run defaults to the dark carto style.
+        let savedBasemap = null;
+        try {
+            savedBasemap = localStorage.getItem('geoviz_basemap');
+        } catch (e) {}
+        const activeBasemapKey = savedBasemap && this.baseLayers[savedBasemap] ? savedBasemap : 'dark';
+        this.baseLayers[activeBasemapKey].addTo(this.map);
+        this.currentBasemap = activeBasemapKey;
 
         // Mouse Telemetry Listener (throttled: max ~10 updates/sec to avoid IPC/render churn)
         const self = this;
@@ -173,14 +180,19 @@ window.geoVizMap = {
     },
 
     setTheme: function (theme) {
+        // UI theme ONLY — the map basemap is an independent preference and
+        // is never changed as a side effect of toggling the UI theme.
         document.documentElement.setAttribute('data-theme', theme);
         try {
             localStorage.setItem('geoviz_theme', theme);
         } catch (e) {}
-        if (theme === 'light') {
-            this.switchBasemap('light');
-        } else {
-            this.switchBasemap('dark');
+    },
+
+    getUiTheme: function () {
+        try {
+            return localStorage.getItem('geoviz_theme') || 'dark';
+        } catch (e) {
+            return 'dark';
         }
     },
 
@@ -192,6 +204,19 @@ window.geoVizMap = {
             }
         });
         this.baseLayers[basemapKey].addTo(this.map);
+        this.currentBasemap = basemapKey;
+        try {
+            localStorage.setItem('geoviz_basemap', basemapKey);
+        } catch (e) {}
+    },
+
+    // Basemap currently displayed (persisted across sessions).
+    getBasemap: function () {
+        let saved = null;
+        try {
+            saved = localStorage.getItem('geoviz_basemap');
+        } catch (e) {}
+        return this.currentBasemap || (saved && this.baseLayers[saved] ? saved : 'dark');
     },
 
     addOrUpdateGeoJsonLayer: function (layerId, geoJsonStr, style, isVisible, opacity) {

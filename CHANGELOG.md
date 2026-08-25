@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [3.0.2] - 2026-08-25
+
+### Fixed
+- **UI theme and map basemap were coupled**: toggling the UI dark/light theme silently switched the map basemap too. The two are now independent preferences — the UI theme control only restyles the interface, and the basemap selector only changes the map imagery. Each choice is persisted separately (`geoviz_theme`, `geoviz_basemap`), restored on startup, and never changed without an explicit user action. The basemap selector now also reflects the actually-active basemap after a reload.
+
 ## [3.0.1] - 2026-08-25
 
 ### Fixed

@@ -145,6 +145,20 @@
         _dotNetRef = DotNetObjectReference.Create(this);
         await JsRuntime.InvokeVoidAsync("geoVizMap.initMap", "map-container", _dotNetRef);
         _mapReady = true;
+
+        // Reflect the persisted basemap in the selector (UI theme and map
+        // theme are independent preferences).
+        try
+        {
+            var saved = await JsRuntime.InvokeAsync<string>("geoVizMap.getBasemap");
+            if (!string.IsNullOrEmpty(saved)) _currentBasemap = saved;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch
+        {
+            /* selector defaults to dark; best-effort */
+        }
+
         await SyncMapAsync();
     }
 
