@@ -39,6 +39,21 @@ public sealed class AppState
     /// <summary>Index of the feature last clicked on the map (table sync).</summary>
     public int? ActiveFeatureIndex { get; private set; }
 
+    /// <summary>
+    /// Layer that should be auto-focused after its first render — set on
+    /// explicit user actions (import, add-result) whose target may be so
+    /// small it looks like the load failed. Consumed by the map canvas.
+    /// </summary>
+    public string? PendingAutoFocusLayerId { get; private set; }
+
+    /// <summary>Acknowledges and clears the auto-focus intent (no re-render).</summary>
+    public string? ConsumePendingAutoFocus()
+    {
+        var pending = PendingAutoFocusLayerId;
+        PendingAutoFocusLayerId = null;
+        return pending;
+    }
+
     public void SetActiveFeature(int? index)
     {
         ActiveFeatureIndex = index;
@@ -206,6 +221,7 @@ public sealed class AppState
         });
         _layers.Add(outcome.Layer);
         ActiveLayerId = outcome.Layer.Id;
+        PendingAutoFocusLayerId = outcome.Layer.Id;
         await RefreshStatsInternalAsync();
         ClearError();
         Notify();
@@ -455,6 +471,7 @@ public sealed class AppState
         var layer = await _tauri.AddResultLayerAsync(result);
         _layers.Add(layer);
         ActiveLayerId = layer.Id;
+        PendingAutoFocusLayerId = layer.Id;
         await RefreshStatsInternalAsync();
         Notify();
         return layer;

@@ -356,6 +356,42 @@ window.geoVizMap = {
         }
     },
 
+    // Smart auto-focus after a fresh import: if the layer's on-screen
+    // footprint is too small to notice (or lands outside the viewport),
+    // fit it into view so users never mistake a loaded layer for a
+    // failed one. Returns true when the camera moved.
+    focusLayerSmart: function (layerId, minPixelSize) {
+        if (!this.map || !this.vectorLayers[layerId]) return false;
+        try {
+            const layer = this.vectorLayers[layerId];
+            if (!layer.getBounds) return false;
+            const bounds = layer.getBounds();
+            if (!bounds || !bounds.isValid()) return false;
+
+            const size = this.map.getSize();
+            if (!size || size.x === 0 || size.y === 0) return false;
+
+            const nw = this.map.latLngToContainerPoint(bounds.getNorthWest());
+            const se = this.map.latLngToContainerPoint(bounds.getSouthEast());
+            const pxW = Math.abs(se.x - nw.x);
+            const pxH = Math.abs(se.y - nw.y);
+            const threshold = minPixelSize || 140;
+
+            const offScreen = se.x < 0 || nw.x > size.x || se.y < 0 || nw.y > size.y;
+            const tooSmall = pxW < threshold && pxH < threshold;
+            const degenerate = !isFinite(pxW) || !isFinite(pxH) || (pxW === 0 && pxH === 0);
+
+            if (tooSmall || offScreen || degenerate) {
+                this.map.fitBounds(bounds, { padding: [70, 70], maxZoom: 18 });
+                return true;
+            }
+            return false;
+        } catch (e) {
+            console.warn("focusLayerSmart failed for " + layerId, e);
+            return false;
+        }
+    },
+
     fitAllLayers: function () {
         if (!this.map) return;
         const layers = Object.values(this.vectorLayers);

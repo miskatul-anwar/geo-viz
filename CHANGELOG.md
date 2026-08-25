@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-08-25
+
+### Fixed
+- **Small layers looked like failed imports**: importing a dataset whose footprint covers only a few pixels of the viewport gave no visual feedback, so users believed the load had failed. Fresh imports (and analysis results added to the map) are now measured on-screen after their first render — if the footprint is under ~140 px, degenerate to a point, or lands outside the viewport, the map silently fits the layer into view (capped at zoom 18). Large, already-visible layers are never disturbed.
+
 ## [3.0.0] - 2026-08-24
 
 Major release: **offline GIS toolbox parity** — the analytical toolboxes mandated by the specification sheet (`GIS Clone Specification Sheet.md`), with a full compliance matrix in `docs/SPEC-COMPLIANCE.md`. The tool catalog grows from 13 to 32 tools; backend test suite grows from 24 to 56.

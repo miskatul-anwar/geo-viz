@@ -168,6 +168,10 @@
     {
         try
         {
+            // Fresh-import intent: focus the new layer if it renders too
+            // small to see (consumed once, regardless of sync outcome).
+            var autoFocusId = State.ConsumePendingAutoFocus();
+
             foreach (var layer in State.Layers)
             {
                 var detail = await State.ResolveDatasetAsync(layer.DatasetId);
@@ -192,6 +196,14 @@
                     "geoVizMap.addOrUpdateGeoJsonLayer",
                     layer.Id, detail.Geojson, layer.Style, true, layer.Opacity);
                 _syncSignatures[layer.Id] = signature;
+
+                // Smart zoom: a freshly imported layer that occupies only a
+                // handful of pixels is silently fitted into the viewport.
+                if (autoFocusId == layer.Id)
+                {
+                    autoFocusId = null;
+                    await JsRuntime.InvokeVoidAsync("geoVizMap.focusLayerSmart", layer.Id, 140);
+                }
             }
 
             // Remove layers deleted from state.
